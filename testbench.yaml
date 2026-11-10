@@ -1,0 +1,2 @@
+providers:
+  - N2ns\Stats\StatsServiceProvider

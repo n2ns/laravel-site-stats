@@ -1,0 +1,10 @@
+{
+  "name": "n2ns-laravel-stats-js",
+  "private": true,
+  "scripts": {
+    "test": "node --test js-tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0"
+  }
+}
