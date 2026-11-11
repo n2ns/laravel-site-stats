@@ -25,6 +25,10 @@ class ReportTable extends TableWidget
 {
     use ReadsSelection;
 
+    // Part of the statistics page only, not of the panel's widget discovery (declared here, not in the trait:
+    // PHP before 8.5 rejects a trait property whose default differs from the parent's).
+    protected static bool $isDiscovered = false;
+
     // Loaded when its tab is shown, so hidden tabs cost nothing on page load.
     protected static ?bool $isLazyLoaded = true;
 

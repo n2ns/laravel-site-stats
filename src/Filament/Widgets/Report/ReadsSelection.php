@@ -11,8 +11,6 @@ trait ReadsSelection
 {
     use InteractsWithPageFilters;
 
-    protected static bool $isDiscovered = false;
-
     public static function canView(): bool
     {
         return Gate::allows('viewStats');
