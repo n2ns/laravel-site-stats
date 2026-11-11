@@ -6,6 +6,8 @@ All notable changes to N2N Stats are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-11-12
+
 ### Added
 
 - `dashboard_layout` for a layout to extend takes `sections`: fixed text for other sections of the host layout, such
@@ -178,6 +180,7 @@ All notable changes to N2N Stats are listed here. The format follows
 - Commands `stats:install`, `stats:site`, `stats:token` and `stats:maintain` (scheduled every five
   minutes); configurable retention of aggregates.
 
+[0.1.8]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.8
 [0.1.7]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.7
 [0.1.6]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.6
 [0.1.5]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.5
