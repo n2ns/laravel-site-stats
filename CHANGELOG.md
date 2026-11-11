@@ -6,6 +6,8 @@ All notable changes to N2N Stats are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-11
+
 ### Added
 
 - Time on page and scroll depth: the script reports them when a page is hidden or left; the
@@ -62,4 +64,5 @@ All notable changes to N2N Stats are listed here. The format follows
 - Commands `stats:install`, `stats:site`, `stats:token` and `stats:maintain` (scheduled every five
   minutes); configurable retention of aggregates.
 
+[0.1.1]: https://github.com/n2ns/laravel-stats/releases/tag/v0.1.1
 [0.1.0]: https://github.com/n2ns/laravel-stats/releases/tag/v0.1.0
