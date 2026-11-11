@@ -1,5 +1,6 @@
 <?php
 
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Testing\TestResponse;
@@ -101,6 +102,7 @@ it('rate limits per ip', function () {
 });
 
 it('rate limits per visitor', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-11-11 12:00:00', 'UTC')); // the minute later must be the same day (daily rows)
     config(['stats.rate_limits.per_visitor_per_minute' => 2]);
     foreach (range(1, 3) as $i) {
         sendEvent(pageviewFor($this->site))->assertNoContent();
