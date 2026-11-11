@@ -6,6 +6,11 @@ All notable changes to N2N Stats are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Opening a site from the Filament Sites list (its name, View or Edit) showed 404: the list linked by the
+  sequential id while the pages look sites up by public id. Sites are now addressed by public id everywhere.
+
 ## [0.1.3] - 2026-11-11
 
 ### Changed

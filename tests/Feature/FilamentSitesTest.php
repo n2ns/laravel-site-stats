@@ -51,6 +51,23 @@ it('lists the sites in the navigation group with a link to their statistics', fu
     Livewire::test(ListSites::class)->assertCanSeeTableRecords(Site::all());
 });
 
+it('opens a site from the links of the list', function () {
+    FilamentPanel::allowStats();
+    $site = S::site('Alpha');
+
+    $html = $this->get('/admin/stats-sites')->assertOk()->getContent();
+    preg_match_all('#href="(http://localhost/admin/stats-sites/[^"]+)"#', $html, $links);
+    $links = array_values(array_unique(array_filter($links[1], fn (string $url): bool => ! str_ends_with($url, '/create'))));
+
+    expect($links)->toBe([
+        'http://localhost/admin/stats-sites/'.$site->public_id,
+        'http://localhost/admin/stats-sites/'.$site->public_id.'/edit',
+    ]);
+    foreach ($links as $link) {
+        $this->get($link)->assertOk()->assertSee('Alpha');
+    }
+});
+
 it('creates a site with the same normalisation as the standalone site manager', function () {
     FilamentPanel::allowStats();
 

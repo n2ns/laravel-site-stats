@@ -46,6 +46,12 @@ class Site extends Model
 
     protected $casts = ['domains' => 'array', 'locales' => 'array', 'exclude_paths' => 'array', 'public_counts' => 'boolean'];
 
+    /** URLs identify a site by its public id, never by its sequential id (the Filament resource binds records by it). */
+    public function getRouteKeyName(): string
+    {
+        return 'public_id';
+    }
+
     public function getTable(): string
     {
         return Tables::name('sites');
