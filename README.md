@@ -25,12 +25,12 @@ outbound clicks, downloads, custom events and AI fetches for any number of websi
 
 | Collected (as daily counts) | Not collected |
 | --- | --- |
-| Page path (without query string or fragment) | IP addresses |
+| Page path (without query string or fragment), page title, page type and content group | IP addresses |
 | Referrer host, UTM parameters, source type | Full User-Agent strings |
 | Country (from the `CF-IPCountry` header) | Cookies or any browser storage |
-| Device class, browser, operating system, language | Individual page views or sessions |
-| Outbound link and download targets (without query string) | Identifiers that last longer than a day |
-| Custom event names and labels | Anything about a visitor across days or sites |
+| Device class, browser, operating system, browser language, site language version | Individual page views or sessions |
+| Outbound link, download and event targets (without query string) | Identifiers that last longer than a day |
+| Custom event names and labels; moves between pages within a visit | Anything about a visitor across days or sites |
 | AI fetcher requests (server side) | |
 
 See [PRIVACY.md](PRIVACY.md) for the full list and a paragraph you can adapt for your privacy policy.
@@ -107,7 +107,9 @@ The package schedules `stats:maintain` every five minutes. It ends visits that h
 php artisan stats:site create --name="Example" --domain=example.com --domain=*.example.org --timezone=Europe/Berlin
 ```
 
-The command prints the site's public id and its snippet. Add the snippet to the `<head>` of every page:
+The command prints the site's public id and its snippet. With `collector_domain` set, the snippet
+points to `https://` on that domain; otherwise its URL is built from `APP_URL`, so set `APP_URL` to the
+app's public URL first. Add the snippet to the `<head>` of every page:
 
 ```html
 <script defer data-site="01JC7…" src="https://stats.example.com/js/stats.js"></script>
@@ -116,7 +118,17 @@ The command prints the site's public id and its snippet. Add the snippet to the 
 - **Domains** are the hostnames allowed to send data for the site. `example.com` also accepts
   `www.example.com`; `*.example.com` accepts `example.com` and every subdomain. Events from other
   hosts, from `localhost` and from IP addresses are dropped.
+- **Testing locally**: the script sends nothing on `localhost` or an IP address. Open the page
+  under a hostname that resolves to your machine, such as `127.0.0.1.nip.io`, and add that hostname
+  to the site's domains.
 - **Timezone** decides where a day starts and ends for the site's daily aggregates (default `UTC`).
+- **Site languages** (`--locale=en --locale=zh-cn`, optional): the URL path prefixes of the site's
+  language versions. Each page view is counted under its language version (the first path segment
+  when it is one of them, otherwise `--default-locale`), so you see which language versions are read.
+- **Excluded paths** (`--exclude-path=/admin*`, repeatable): paths that are never counted, for every
+  way of sending (script and server); `*` matches any characters.
+- **Public counts** (`--public-counts`, off by default): lets anyone read the all-time view and event
+  counts of the site's pages without a token, see [Public counts](#public-counts).
 
 Other actions:
 
@@ -127,12 +139,13 @@ php artisan stats:site delete --site=<public id>          # asks first; --force 
 php artisan stats:site key --site=<public id>             # server key for client mode, see below
 ```
 
-`update` replaces the domain list when any `--domain` is given. `delete` removes the site and all
+`update` replaces the domain, site language and excluded path lists when any `--domain`, `--locale` or
+`--exclude-path` is given. `delete` removes the site and all
 of its statistics. Sites can also be added and edited on the dashboard.
 
 ## The tracking script
 
-The script is a single dependency-free file of about 2 KB.
+The script is a single dependency-free file of about 6 KB.
 
 **Automatic:**
 
@@ -142,20 +155,35 @@ The script is a single dependency-free file of about 2 KB.
 - An `outbound` event when a link to another host is clicked (left or middle button).
 - A `download` event when a link to a file with one of the configured `download_extensions`
   (pdf, zip, dmg, exe, apk, …) is clicked.
+- Outbound and download events carry the link and, when the link or one of its parents has a
+  `data-stats-label` attribute, that label, e.g. the project a card belongs to:
+  `<div data-stats-label="pairdock"><a href="https://github.com/…">…</a></div>`.
+
+**Page details** make reports easier to read. Each page view sends the page title and, when present,
+these meta tags. After a single-page-app navigation the page view is sent once the router has had a
+chance to render the new page, so the new title and meta tags are the ones sent:
+
+```html
+<meta name="n2n-stats:type" content="article">   <!-- page type: [a-z0-9_-], up to 40 characters -->
+<meta name="n2n-stats:group" content="post-42">  <!-- shared by the language versions of one piece of content -->
+<meta name="n2n-stats:skip">                      <!-- e.g. on the 404 page: nothing is sent from this page -->
+```
 
 **Custom events**, either from JavaScript:
 
 ```js
-window.n2nStats('signup', { label: 'pro-plan' });
+window.n2nStats('signup', { label: 'pro-plan', target: '/checkout' });
 ```
 
-or without JavaScript, by marking an element; a click sends the event:
+or without JavaScript, by marking an element; a click sends the event, and when the element is or
+is inside a link, the link (internal links too) is sent as its target:
 
 ```html
-<button data-stats-event="signup" data-stats-label="pro-plan">Sign up</button>
+<a href="/checkout?plan=pro" data-stats-event="cta" data-stats-label="pro-plan">Buy</a>
 ```
 
-Event names match `[a-z0-9_.-]{1,64}`; labels are at most 120 characters.
+Event names match `[a-z0-9_.-]{1,64}`; labels are at most 120 characters; targets are stored
+without query string.
 
 **Exclusions:** nothing is sent when `navigator.webdriver` is true (automated browsers), on
 `file://` pages, or on localhost, `127.0.0.1` and `[::1]`. A `data-exclude-paths` attribute on the
@@ -168,18 +196,49 @@ Data is sent with `navigator.sendBeacon` (or `fetch` with `keepalive` and no cre
 `text/plain` request, so browsers do not send a CORS preflight. The collector always answers
 `204 No Content`, also when it drops an event; only malformed requests get `400`.
 
-## Client mode and AI fetches
+## Counting on the server
 
-AI crawlers and assistants (GPTBot, ChatGPT-User, ClaudeBot, PerplexityBot, …) do not run
-JavaScript, so they are counted on the server by the `TrackAiFetches` middleware. Each matching
-request is recorded as an `ai_fetch` event with the fetcher's name and the requested path.
+Three things can be counted by your Laravel app itself instead of the browser:
 
-- **On the host app**, add the middleware to your web routes; it writes to the database directly.
-  Set `STATS_HOST_SITE` to the host's own site public id, so the site is not taken from the
-  request's `Host` header. Only successful (2xx) GET responses are counted, at most
-  `rate_limits.server_events_per_minute` per site and minute.
+- **AI fetches.** AI crawlers and assistants (GPTBot, ChatGPT-User, ClaudeBot, PerplexityBot, …) do
+  not run JavaScript. The `TrackAiFetches` middleware records each matching GET request answered with
+  2xx or 3xx as an `ai_fetch` event with the fetcher's name and the requested path. Fetchers listed in
+  `ai_user_fetchers` (ChatGPT-User, Claude-User, Perplexity-User) are shown as user-triggered, the
+  others as crawlers.
+- **Page views, optionally.** The `TrackPageviews` middleware counts GET requests answered with 2xx
+  and an HTML body (not prefetches, bots or the package's own pages). Visitors without JavaScript are
+  counted, and 404 pages or made-up paths are not. Describe a page from your controller or view:
+
+  ```php
+  use N2ns\Stats\Stats;
+
+  Stats::page(title: $post->title, type: 'article', group: 'post-'.$post->id);
+  ```
+
+  A site counted this way must **not** also send page views from the script, or every view is
+  counted twice. To keep the script's outbound, download and custom events, load it with
+  `data-pageviews="off"`:
+
+  ```html
+  <script defer data-site="01JC7…" data-pageviews="off" src="https://stats.example.com/js/stats.js"></script>
+  ```
+- **Events from the server**, e.g. when a controller redirects to a checkout:
+
+  ```php
+  Stats::event('checkout_start', label: 'pro', target: $checkoutUrl);
+  ```
+
+  The event is counted after the response, for the visitor of the current request, and is credited
+  to that visitor's visit like events from the script.
+
+- **On the host app**, the middleware and `Stats::event()` write to the database directly, through
+  the same checks as the collector (site domains, rate limits, bot filter, excluded paths). Set
+  `STATS_HOST_SITE` to the host's own site public id, so the site is not taken from the request's
+  `Host` header. AI fetches are limited to `rate_limits.server_events_per_minute` per site and minute.
 - **On another Laravel site**, install the same package in **client mode**. It creates no tables
-  and only sends these events to the host. Create a server key on the host:
+  and only sends these events to the host (for page views and events together with the visitor's IP
+  address and User-Agent, which the host needs for the daily visitor hash and does not store).
+  Create a server key on the host:
 
   ```bash
   php artisan stats:site key --site=<public id>
@@ -200,29 +259,45 @@ Register the middleware, for example in `bootstrap/app.php`:
 
 ```php
 use N2ns\Stats\Http\Middleware\TrackAiFetches;
+use N2ns\Stats\Http\Middleware\TrackPageviews;
 
 ->withMiddleware(function (Middleware $middleware) {
-    $middleware->web(append: [TrackAiFetches::class]);
+    $middleware->web(append: [TrackAiFetches::class, TrackPageviews::class]); // TrackPageviews only if wanted
 })
 ```
 
-In client mode the event is sent after the response has been delivered, with a 2-second timeout;
-failures are ignored and never affect the page.
+In client mode everything is sent after the response has been delivered, with a 2-second timeout;
+failures are logged and never affect the page.
 
 ## Dashboard
 
 Open `/stats` (the `dashboard_path`) on your app's domain. It is plain server-rendered Blade with
-inline SVG charts: no front-end build and no CDN.
+inline SVG charts: no front-end build and no CDN. The interface is in English and Simplified Chinese
+and follows your app's locale (`zh_CN` shows Chinese).
 
-- Site switcher and date ranges (today, yesterday, 7, 30 and 90 days, this month, last month,
-  custom), compared with the previous period of the same length.
-- Overview: visitors, visits, page views, views per visit, bounce rate, average visit duration,
-  visitors online now (visits with activity in the last 5 minutes) and a daily chart.
-- Reports: pages (views, visitors, entries, exits), sources by type and source, UTM campaigns,
-  countries, devices, browsers, operating systems, languages, outbound links, downloads, custom
-  events and AI (visits referred by AI assistants, AI fetchers and the pages they fetched). Each
-  report shows the top 50 rows; the CSV export contains up to 500 rows.
-- Site management: add sites, edit domains and timezone, show the embed snippet, reset the server key.
+- Site switcher and date ranges (today, yesterday, 7, 15, 30 and 90 days, this month, last month,
+  custom). Changes are computed over complete days: a range that includes today compares its days up
+  to yesterday with the same number of days before (today alone compares yesterday with the day
+  before); the page shows both compared ranges.
+- Overview: visitors, visits, page views, pages viewed, views per visit, bounce rate, average visit
+  duration, events, outbound clicks, visitors online now (visits with activity in the last 5 minutes)
+  and a daily chart of visitors, visits, page views, events and outbound clicks.
+- **Pages:** pages with title and type, entry pages with the page views, outbound clicks and events
+  of the visits that started there, exit pages, page types, content groups, and moves from page to page.
+- **Sources:** source types and sources (with page views, outbound clicks and events), UTM campaigns,
+  and landing pages by source, by campaign and by search engine.
+- **Visitors:** countries, devices, browsers, operating systems, browser languages and site languages,
+  with visits, visitors and page views.
+- **Events:** custom events with label and target, outbound links and downloads with label, and every
+  event with the page it happened on.
+- **AI:** visits and visitors referred by AI assistants and AI fetches with a daily chart, AI referrals,
+  the pages AI assistants send visitors to, AI fetchers (crawler or user-triggered, with the number of
+  pages fetched) and the pages they fetched.
+- Every table shows the top 50 rows with each row's share, can be sorted by any column and exported
+  as CSV (up to 500 rows); source types, countries, devices, site languages and page types also have
+  a donut chart.
+- Site management: add sites, edit domains, timezone, site languages, excluded paths and public
+  counts, show the embed snippet, reset the server key.
 
 ## Filament
 
@@ -231,11 +306,12 @@ If your app uses [Filament](https://filamentphp.com), register the plugin in you
 ```php
 use N2ns\Stats\Filament\StatsPlugin;
 
-$panel->plugin(StatsPlugin::make());
+$panel->plugin(StatsPlugin::make()->navigationGroup('Analytics')->navigationLabel('Statistics'));
 ```
 
-It adds widgets with each site's visitors and page views for today and the last 7 days (with the
-change against the previous period) and the top 5 sources of the last 7 days, linking to the dashboard.
+It adds a page with the full dashboard inside your panel, and widgets with each site's visitors and
+page views for today and the last 7 days (with the change over complete days) and the top 5 sources
+of the last 7 days. Both are visible to users allowed by the `viewStats` gate.
 
 ## Read API
 
@@ -252,13 +328,24 @@ The token is shown only once; only its SHA-256 hash is stored. Send it as a bear
 | Endpoint | Returns |
 | --- | --- |
 | `GET /api/v1/sites` | The sites the token can read |
-| `GET /api/v1/sites/{public_id}/summary?from=&to=` | Totals for the range, with the previous period for comparison |
-| `GET /api/v1/sites/{public_id}/timeseries?from=&to=` | Daily values for the range |
-| `GET /api/v1/sites/{public_id}/breakdown/{report}?from=&to=&limit=` | Top rows of one report |
+| `GET /api/v1/sites/{public_id}/summary` | Totals for the range, and `comparison`: the complete-day current and previous ranges with their totals |
+| `GET /api/v1/sites/{public_id}/timeseries` | Daily visitors, visits, page views, events and outbound clicks |
+| `GET /api/v1/sites/{public_id}/ai` | AI visits, visitors, page views and fetches, with a daily series |
+| `GET /api/v1/sites/{public_id}/breakdown/{report}?limit=&offset=&min_visitors=` | Rows of one report |
+| `GET /api/v1/sites/{public_id}/snapshot?limit=&min_visitors=` | Summary, timeseries, AI and the top rows of every report in one call |
 
-`report` is one of `pages`, `entries`, `exits`, `sources`, `source_types`, `campaigns`, `countries`,
-`devices`, `browsers`, `os`, `languages`, `outbound`, `downloads`, `events`, `ai`. Dates are `YYYY-MM-DD` in the site's
-timezone; a range covers at most 366 days. Requests are limited to 60 per minute per token.
+`report` is one of `pages`, `entries`, `exits`, `page_types`, `content`, `transitions`, `source_types`,
+`sources`, `campaigns`, `landing_pages`, `campaign_pages`, `search_pages`, `countries`, `devices`,
+`browsers`, `os`, `languages`, `locales`, `outbound`, `downloads`, `events`, `event_pages`, `ai_referrals`,
+`ai_pages`, `ai_fetchers`, `ai_fetched_pages`. Breakdown rows are paged with `limit` (1–500, default 50)
+and `offset`; `has_more` says whether more rows follow. `min_visitors` leaves out rows with fewer
+visitors. The snapshot's `limit` is 1–100 (default 10).
+
+Every per-site endpoint takes the range as `from` and `to` (`YYYY-MM-DD` in the site's timezone; at
+most 366 days; default the last 30 days) or as `period`, one of `today`, `yesterday`, `7d`, `15d`,
+`30d`, `90d`, `month`, `last_month` (the same ranges as the dashboard). An unknown period, or a period
+together with `from` or `to`, returns 422. Responses include `partial: true` when the range includes
+the site's today, whose numbers are still growing. Requests are limited to 60 per minute per token.
 
 ```bash
 curl -H "Authorization: Bearer $STATS_TOKEN" \
@@ -268,25 +355,44 @@ curl -H "Authorization: Bearer $STATS_TOKEN" \
   "https://stats.example.com/api/v1/sites/01JC7…/breakdown/pages?from=2026-11-01&to=2026-11-30&limit=10"
 ```
 
+## Public counts
+
+To show view or like counts on your own pages, turn on public counts for the site
+(`stats:site update --site=<public id> --public-counts`, or on the dashboard). Then anyone can read
+all-time numbers without a token:
+
+```bash
+curl "https://stats.example.com/api/public/sites/01JC7…/counts?path[]=/blog/hello&event[]=like"
+```
+
+```json
+{"site":"01JC7…","pages":{"/blog/hello":{"pageviews":1234,"last_date":"2026-11-10"}},"events":{"like":{"post-42":56}}}
+```
+
+Up to 50 paths and 20 custom event names per request; event counts are grouped by label. Responses
+allow any origin (`Access-Control-Allow-Origin: *`), are cacheable for 60 seconds and are limited to
+`rate_limits.public_per_minute` requests per IP and minute. Sites without public counts answer 404.
+
 ## Configuration
 
 Publish the file with `php artisan vendor:publish --tag=stats-config`. Main options:
 
 | Key | Env | Default | Meaning |
 | --- | --- | --- | --- |
-| `mode` | `STATS_MODE` | `host` | `host` stores data and serves the collector, dashboard and API; `client` only sends AI fetch events to a host |
+| `mode` | `STATS_MODE` | `host` | `host` stores data and serves the collector, dashboard and API; `client` only sends server-side events (AI fetches, page views, events) to a host |
 | `table_prefix` | `STATS_TABLE_PREFIX` | `stats_` | Prefix of all tables |
 | `collector_domain` | `STATS_COLLECTOR_DOMAIN` | none | Domain for the script, collector and API; none = the current domain |
 | `collector_path` | `STATS_COLLECTOR_PATH` | empty | Path prefix of those routes |
 | `dashboard_path` | `STATS_DASHBOARD_PATH` | `stats` | Dashboard route prefix |
 | `dashboard_middleware` | | `['web']` | Middleware of the dashboard routes (the `viewStats` gate is always applied) |
-| `host_site` | `STATS_HOST_SITE` | none | Host mode: public id of the site whose AI fetches the middleware counts; none = found by the `Host` header |
+| `host_site` | `STATS_HOST_SITE` | none | Host mode: public id of the site the middleware and `Stats::event()` count for; none = found by the `Host` header |
 | `visit_timeout_minutes` | | `30` | Idle time that ends a visit |
 | `retention_days` | `STATS_RETENTION_DAYS` | none | Days to keep daily aggregates; none = forever |
-| `rate_limits` | | | Collector limits per site (3000/min), per IP (120/min, IPv6 per /64) and per visitor (60/min); server events and API |
+| `rate_limits` | | | Collector limits per site (3000/min), per IP (120/min, IPv6 per /64) and per visitor (60/min); AI fetches per site (600/min), API per token (60/min), public counts per IP (120/min) |
 | `max_new_rows_per_day` | | `5000` | New daily rows per site, day and table; further values are counted under `(other)` |
 | `bot_user_agents` | | | User-Agent substrings that are dropped as bots |
 | `ai_fetchers` | | | User-Agent substrings counted as AI fetchers |
+| `ai_user_fetchers` | | | AI fetchers that fetch on a person's request (the others are crawlers) |
 | `search_hosts`, `social_hosts`, `ai_hosts` | | | Referrer hosts that classify a source as search, social or AI |
 | `click_ids` | | | Click-id query parameters (`gclid`, `fbclid`, …) and the source they imply |
 | `download_extensions` | | | File extensions counted as downloads |
@@ -298,20 +404,24 @@ All tables use the `table_prefix`. Daily tables are bucketed by the site's timez
 
 | Table | Contents | Kept |
 | --- | --- | --- |
-| `stats_sites` | Name, public id, allowed domains, timezone, hash of the server key | Until deleted |
+| `stats_sites` | Name, public id, allowed domains, timezone, site languages, excluded paths, public counts, hash of the server key | Until deleted |
 | `stats_api_tokens` | Name, hash of the token, allowed sites, last use | Until revoked |
-| `stats_daily_totals` | Page views, visitors, visits, bounces, visit duration, events per day | `retention_days` |
-| `stats_daily_pages` | Per path: page views, visitors, entries, exits | `retention_days` |
-| `stats_daily_sources` | Per source (type, host or UTM source, medium, campaign, content, term): visits, visitors, page views, bounces | `retention_days` |
-| `stats_daily_dimensions` | Per country, device, browser, OS, language: visits, visitors | `retention_days` |
-| `stats_daily_events` | Outbound clicks, downloads, custom events and AI fetches per name, target and page: count, visitors | `retention_days` |
+| `stats_daily_totals` | Page views, visitors, visits, bounces, visit duration, events, outbound clicks per day | `retention_days` |
+| `stats_daily_pages` | Per path: page views, visitors, entries, exits, the page views, outbound clicks and events of visits that entered there; title, page type, content group | `retention_days` |
+| `stats_daily_sources` | Per source (type, host or UTM source, medium, campaign, content, term): visits, visitors, page views, bounces, outbound clicks, events | `retention_days` |
+| `stats_daily_entries` | Per entry page and source: visits, visitors | `retention_days` |
+| `stats_daily_transitions` | Per move from one page to another: count, visitors | `retention_days` |
+| `stats_daily_dimensions` | Per country, device, browser, OS, browser language, site language: visits, visitors, page views | `retention_days` |
+| `stats_daily_events` | Outbound clicks, downloads, custom events and AI fetches per name, label, target and page: count, visitors | `retention_days` |
 | `stats_salts` | The random salt of each day | Two days |
 | `stats_uniques` | Visitor hashes already counted per day and report row | Two days |
-| `stats_visits` | Visits in progress (hash, start, last activity, page views, entry and exit page, source) | Until 30 minutes idle |
+| `stats_visits` | Visits in progress (hash, start, last activity, page views, entry and exit page, source, device class, browser, OS, country, language) | Until 30 minutes idle |
 
 ## How the metrics are defined
 
-- **Page view:** one per page load or single-page-app path change reported by the script.
+- **Page view:** one per page load or single-page-app path change reported by the script, or per
+  successful HTML response counted by the `TrackPageviews` middleware.
+- **Pages viewed:** the number of different paths with at least one page view in the range.
 - **Visitor:** a unique `sha256(daily salt + site + IP + User-Agent)` within one day. The salt
   changes daily, so the same person is a new visitor every day. **Visitors over a range of days are
   the sum of the daily unique visitors**, not a count of distinct people.
@@ -322,11 +432,16 @@ All tables use the `table_prefix`. Daily tables are bucketed by the site's timez
   (in that order: UTM, AI, search, social, click id, other referrer, direct). Referrals from the
   site itself count as direct.
 - **Bounce:** a visit that ended with exactly one page view. Bounce rate = bounces / visits.
+- **Events:** outbound clicks, downloads and custom events (AI fetches are counted separately). An
+  event is credited to the source and the entry page of the visit it happens in.
+- **Page move:** two consecutive page views of one visit on different paths.
 - **Visit duration:** the time between the first and the last activity of a visit; the total of
   ended visits is stored, and the average is derived from it. A single page view without further
   events lasts 0 seconds.
-- Bounces, durations and exit pages are counted when a visit ends (30 minutes after its last
+- Bounces, durations, exit pages, page views per country, device, browser, OS and browser language,
+  and the page views after an entry page are counted when a visit ends (30 minutes after its last
   activity), so the most recent figures fill in with a delay.
+- **Comparisons** use complete days only (see [Dashboard](#dashboard)).
 
 ## Limitations
 
@@ -339,8 +454,9 @@ All tables use the `table_prefix`. Daily tables are bucketed by the site's timez
   browser sends one.
 - **Values beyond `max_new_rows_per_day`** for a site and day are grouped under `(other)`.
 - **No conversions or revenue yet.** Goals, funnels and revenue tracking are not part of this version.
-- Visitors without JavaScript (and crawlers other than the AI fetchers counted by the middleware)
-  are not counted.
+- With the script alone, visitors without JavaScript are not counted, and a page that loads the
+  script is counted whatever its HTTP status unless it carries `<meta name="n2n-stats:skip">`. Use the
+  `TrackPageviews` middleware for server-side page views. Crawlers other than AI fetchers are never counted.
 
 ## Contributing and security
 

@@ -4,6 +4,7 @@ namespace N2ns\Stats\Console;
 
 use Illuminate\Console\Command;
 use N2ns\Stats\Http\Middleware\TrackAiFetches;
+use N2ns\Stats\Http\Middleware\TrackPageviews;
 
 class InstallCommand extends Command
 {
@@ -37,7 +38,8 @@ class InstallCommand extends Command
         $this->line('  3. Add the snippet to the <head> of every page of that site.');
         $this->line('  4. Make sure the Laravel scheduler runs every minute (stats:maintain is scheduled every 5 minutes):');
         $this->line('       * * * * * cd /path-to-your-app && php artisan schedule:run >> /dev/null 2>&1');
-        $this->line('  5. Optional: count AI fetchers of this app with the '.TrackAiFetches::class.' middleware.');
+        $this->line('  5. Optional: count AI fetchers of this app with the '.TrackAiFetches::class.' middleware,');
+        $this->line('     and page views on the server with '.TrackPageviews::class.' (then not with the script).');
         $this->line('  6. Optional: register N2ns\Stats\Filament\StatsPlugin in your Filament panel.');
         $this->newLine();
         $this->line('  Dashboard: '.url((string) config('stats.dashboard_path')));
@@ -48,6 +50,7 @@ class InstallCommand extends Command
         $this->newLine();
         $this->line('  1. On the host, run: php artisan stats:site key --site=<public id>');
         $this->line('  2. Put the printed STATS_CLIENT_* lines in this app\'s .env.');
-        $this->line('  3. Add the '.TrackAiFetches::class.' middleware to your web routes.');
+        $this->line('  3. Add the '.TrackAiFetches::class.' middleware to your web routes, and optionally');
+        $this->line('     '.TrackPageviews::class.' to count page views on the server (then not with the script).');
     }
 }

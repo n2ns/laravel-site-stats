@@ -39,15 +39,16 @@ final class StatsSeeder
         ] + $utm + $values);
     }
 
-    public static function dimension(Site $site, string $date, string $dimension, string $value, int $visits, int $visitors): void
+    public static function dimension(Site $site, string $date, string $dimension, string $value, int $visits, int $visitors, int $pageviews = 0): void
     {
-        DB::table(Tables::name('daily_dimensions'))->insert(compact('dimension', 'value', 'visits', 'visitors', 'date') + ['site_id' => $site->id]);
+        DB::table(Tables::name('daily_dimensions'))->insert(compact('dimension', 'value', 'visits', 'visitors', 'pageviews', 'date') + ['site_id' => $site->id]);
     }
 
-    public static function event(Site $site, string $date, string $kind, string $name, ?string $target, ?string $path, int $count, int $visitors = 0): void
+    public static function event(Site $site, string $date, string $kind, string $name, ?string $target, ?string $path, int $count, int $visitors = 0, ?string $label = null): void
     {
         DB::table(Tables::name('daily_events'))->insert([
             'site_id' => $site->id, 'date' => $date, 'kind' => $kind, 'name' => $name,
+            'label' => $label, 'label_hash' => hash('sha256', (string) $label),
             'target' => $target, 'target_hash' => hash('sha256', (string) $target),
             'path' => $path, 'path_hash' => hash('sha256', (string) $path),
             'count' => $count, 'visitors' => $visitors,
@@ -59,6 +60,24 @@ final class StatsSeeder
         DB::table(Tables::name('visits'))->insert([
             'site_id' => $site->id, 'visitor_hash' => $visitor, 'started_at' => $lastSeen, 'date' => $lastSeen->format('Y-m-d'),
             'last_seen_at' => $lastSeen, 'pageviews' => 1, 'entry_path_hash' => 'x', 'exit_path_hash' => 'x', 'source_key' => 'x',
+            'dimensions' => '{}',
+        ]);
+    }
+
+    public static function entry(Site $site, string $date, string $path, string $type, ?string $source, int $visits, int $visitors, ?string $campaign = null): void
+    {
+        DB::table(Tables::name('daily_entries'))->insert([
+            'site_id' => $site->id, 'date' => $date, 'path' => $path, 'path_hash' => hash('sha256', $path),
+            'source_key' => hash('sha256', implode('|', [$type, $source, $campaign])), 'source_type' => $type, 'source' => $source,
+            'utm_campaign' => $campaign, 'visits' => $visits, 'visitors' => $visitors,
+        ]);
+    }
+
+    public static function transition(Site $site, string $date, string $from, string $to, int $count, int $visitors): void
+    {
+        DB::table(Tables::name('daily_transitions'))->insert([
+            'site_id' => $site->id, 'date' => $date, 'from_path' => $from, 'from_hash' => hash('sha256', $from),
+            'to_path' => $to, 'to_hash' => hash('sha256', $to), 'count' => $count, 'visitors' => $visitors,
         ]);
     }
 }

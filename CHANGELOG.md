@@ -6,21 +6,34 @@ All notable changes to N2N Stats are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-11
+
 ### Added
 
-- Cookieless collection of page views, sources, entry and exit pages, outbound clicks, file
-  downloads, custom events and unique visitors for many sites, stored only as daily aggregates.
+- Cookieless collection of page views, sources, entry and exit pages, landing pages per source,
+  moves between pages, outbound clicks, file downloads, custom events and unique visitors for many
+  sites, stored only as daily aggregates.
+- Page titles, page types and content groups reported by the page, and per-site language versions
+  taken from the URL prefix.
+- Outbound clicks, downloads and custom events credited to the source and entry page of their visit.
 - Visitors counted with a daily-salted hash of site, IP address and User-Agent; salts and hashes are
   deleted within two days.
 - Visits split after 30 minutes of inactivity, with bounce rate and visit duration.
 - Source classification (UTM, search, social, AI assistants, referral, direct, click ids) and
   country, device, browser, operating system and language reports.
 - A dependency-free tracking script with automatic single-page-app page views, outbound and download
-  tracking, custom events through `window.n2nStats()` or `data-stats-event`, and path exclusions.
-- Server-side counting of AI fetchers with the `TrackAiFetches` middleware, also from other Laravel
-  sites in client mode.
-- A dashboard guarded by the `viewStats` gate, with period comparison, realtime visitors and CSV
-  export, and an optional Filament plugin.
-- A read-only API with scoped bearer tokens.
+  tracking with labels, custom events with label and target through `window.n2nStats()` or
+  `data-stats-event`, page meta tags, path exclusions, and `data-pageviews="off"` for sites that
+  count page views on the server.
+- Server-side counting of AI fetchers (`TrackAiFetches`), of page views (`TrackPageviews`) and of
+  events (`Stats::event()`), also from other Laravel sites in client mode; per-site excluded paths.
+- A dashboard in English and Simplified Chinese guarded by the `viewStats` gate, with complete-day
+  period comparison, realtime visitors, shares, donut charts, sortable tables and CSV export, and an
+  optional Filament plugin with the full dashboard page and widgets.
+- A read-only API with scoped bearer tokens, taking a date range or one of the dashboard's preset
+  periods, with paging, a snapshot of all reports and AI figures.
+- An optional public counts endpoint for showing all-time view and event counts on the site.
 - Commands `stats:install`, `stats:site`, `stats:token` and `stats:maintain` (scheduled every five
   minutes); configurable retention of aggregates.
+
+[0.1.0]: https://github.com/n2ns/laravel-stats/releases/tag/v0.1.0

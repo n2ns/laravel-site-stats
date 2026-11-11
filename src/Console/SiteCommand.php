@@ -16,13 +16,22 @@ class SiteCommand extends Command
         {--name= : Site name}
         {--domain=* : Allowed hostname; *.example.com also allows subdomains (repeatable)}
         {--timezone= : Timezone the days are counted in (default UTC)}
+        {--locale=* : URL path prefix of a language version, e.g. en or zh-cn (repeatable)}
+        {--default-locale= : Language of pages without a locale prefix}
+        {--exclude-path=* : Path that is never counted; * matches any characters (repeatable)}
+        {--public-counts : Allow reading all-time page and event counts without a token}
+        {--no-public-counts : Disallow reading counts without a token}
         {--site= : Public id of the site (update, delete, key)}
         {--force : Delete without asking}';
 
     protected $description = 'Manage the sites tracked by N2N Stats';
 
     /** Tables that hold per-site rows, deleted together with the site. */
-    private const SITE_TABLES = ['uniques', 'visits', 'daily_totals', 'daily_pages', 'daily_sources', 'daily_dimensions', 'daily_events'];
+    public const MAX_LOCALES = 20;
+
+    public const MAX_EXCLUDE_PATHS = 50;
+
+    private const SITE_TABLES = ['uniques', 'visits', 'daily_totals', 'daily_pages', 'daily_sources', 'daily_dimensions', 'daily_events', 'daily_entries', 'daily_transitions'];
 
     public function handle(): int
     {
@@ -45,7 +54,7 @@ class SiteCommand extends Command
         }
         $timezone = $this->validTimezone($this->option('timezone') ?? 'UTC');
 
-        $site = Site::create(['name' => $name, 'domains' => $domains, 'timezone' => $timezone]);
+        $site = Site::create(['name' => $name, 'domains' => $domains, 'timezone' => $timezone] + $this->siteOptions());
 
         $this->components->info("Site created: {$site->public_id}");
         $this->line('Add this snippet to the <head> of every page:');
@@ -66,12 +75,16 @@ class SiteCommand extends Command
         }
 
         $this->table(
-            ['Public id', 'Name', 'Domains', 'Timezone', 'Server key', 'Created'],
+            ['Public id', 'Name', 'Domains', 'Timezone', 'Locales', 'Default locale', 'Excluded paths', 'Public counts', 'Server key', 'Created'],
             $sites->map(fn (Site $site) => [
                 $site->public_id,
                 $site->name,
                 implode(', ', $site->domains),
                 $site->timezone,
+                implode(', ', $site->locales ?? []),
+                (string) $site->default_locale,
+                implode(', ', $site->exclude_paths ?? []),
+                $site->public_counts ? 'yes' : 'no',
                 $site->server_key_hash === null ? 'no' : 'yes',
                 (string) $site->getAttribute('created_at'),
             ])->all(),
@@ -93,8 +106,9 @@ class SiteCommand extends Command
         if ($this->option('timezone') !== null) {
             $changes['timezone'] = $this->validTimezone($this->option('timezone'));
         }
+        $changes += $this->siteOptions();
         if ($changes === []) {
-            return $this->fail('Nothing to update. Pass --name, --domain or --timezone.');
+            return $this->fail('Nothing to update. Pass --name, --domain, --timezone, --locale, --default-locale, --exclude-path, --public-counts or --no-public-counts.');
         }
 
         $site->update($changes);
@@ -144,13 +158,18 @@ class SiteCommand extends Command
 
     public static function snippet(Site $site): string
     {
-        return '<script defer data-site="'.$site->public_id.'" src="'.route('stats.script').'"></script>';
+        return '<script defer data-site="'.$site->public_id.'" src="'.self::collectorBaseUrl().'/js/stats.js"></script>';
     }
 
-    /** Base URL of the collector routes, e.g. https://stats.example.com. */
+    /**
+     * Base URL of the collector routes, e.g. https://stats.example.com. The CLI has no request, so a collector domain
+     * is always given as https; without one the collector shares the host app's domain and the URL comes from APP_URL.
+     */
     private static function collectorBaseUrl(): string
     {
-        return Str::beforeLast(route('stats.script'), '/js/stats.js');
+        $url = Str::beforeLast(route('stats.script'), '/js/stats.js');
+
+        return config('stats.collector_domain') ? 'https://'.Str::after($url, '://') : $url;
     }
 
     private function findSite(): Site
@@ -206,6 +225,69 @@ class SiteCommand extends Command
         }
 
         return preg_match('/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/', $host) === 1;
+    }
+
+    /**
+     * Locales, default locale, excluded paths and public counts given as options (only those passed).
+     *
+     * @return array<string, mixed>
+     */
+    private function siteOptions(): array
+    {
+        $options = [];
+
+        $locales = $this->listOption('locale');
+        if ($locales !== []) {
+            if (count($locales) > self::MAX_LOCALES) {
+                $this->fail('At most '.self::MAX_LOCALES.' --locale values are allowed.');
+            }
+            $options['locales'] = array_values(array_unique(array_map(fn (string $l): string => $this->validLocale($l, '--locale'), $locales)));
+        }
+
+        $default = $this->option('default-locale');
+        if (is_string($default) && $default !== '') {
+            $options['default_locale'] = $this->validLocale($default, '--default-locale');
+        }
+
+        $paths = $this->listOption('exclude-path');
+        if ($paths !== []) {
+            if (count($paths) > self::MAX_EXCLUDE_PATHS) {
+                $this->fail('At most '.self::MAX_EXCLUDE_PATHS.' --exclude-path values are allowed.');
+            }
+            foreach ($paths as $path) {
+                if (! str_starts_with($path, '/') || mb_strlen($path) > 200 || preg_match('/[\x00-\x1F\x7F]/', $path) === 1) {
+                    $this->fail("Invalid --exclude-path \"{$path}\". It must start with / and have at most 200 characters.");
+                }
+            }
+            $options['exclude_paths'] = array_values(array_unique($paths));
+        }
+
+        if ($this->option('public-counts') && $this->option('no-public-counts')) {
+            $this->fail('Pass either --public-counts or --no-public-counts, not both.');
+        }
+        if ($this->option('public-counts')) {
+            $options['public_counts'] = true;
+        } elseif ($this->option('no-public-counts')) {
+            $options['public_counts'] = false;
+        }
+
+        return $options;
+    }
+
+    /** @return list<string> */
+    private function listOption(string $name): array
+    {
+        return array_values(array_filter((array) $this->option($name), fn ($v) => is_string($v) && $v !== ''));
+    }
+
+    private function validLocale(string $locale, string $option): string
+    {
+        $locale = strtolower(trim($locale));
+        if (preg_match('/^[a-z]{2,3}(-[a-z0-9]{2,8})?$/', $locale) !== 1) {
+            $this->fail("Invalid {$option} \"{$locale}\". Use a language code such as en, pt-br or zh-cn.");
+        }
+
+        return $locale;
     }
 
     private function validTimezone(mixed $timezone): string

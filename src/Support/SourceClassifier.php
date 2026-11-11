@@ -39,7 +39,7 @@ class SourceClassifier
             return Source::direct();
         }
 
-        $source = substr(str_starts_with($host, 'www.') ? substr($host, 4) : $host, 0, 191);
+        $source = mb_substr(str_starts_with($host, 'www.') ? substr($host, 4) : $host, 0, 191);
 
         // Exact AI hosts are checked before the search list so gemini.google.com is not counted as google search.
         if (in_array($host, (array) config('stats.ai_hosts', []), true) || in_array($source, (array) config('stats.ai_hosts', []), true)) {

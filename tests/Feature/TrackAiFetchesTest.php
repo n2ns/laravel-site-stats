@@ -25,8 +25,9 @@ it('records ai fetches of the matching site in host mode', function () {
     $this->get('https://example.com/moved', ['User-Agent' => GPTBOT_UA])->assertRedirect();
 
     $events = DB::table('stats_daily_events')->orderBy('path')->get();
-    expect($events)->toHaveCount(1)
-        ->and([$events[0]->kind, $events[0]->name, $events[0]->path, (int) $events[0]->count])->toBe(['ai_fetch', 'gptbot', '/docs/page', 1]);
+    expect($events)->toHaveCount(2)
+        ->and([$events[0]->kind, $events[0]->name, $events[0]->path, (int) $events[0]->count])->toBe(['ai_fetch', 'gptbot', '/docs/page', 1])
+        ->and([$events[1]->name, $events[1]->path])->toBe(['gptbot', '/moved']);
 });
 
 it('uses the pinned host site instead of the Host header', function () {

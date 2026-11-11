@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use N2ns\Stats\Models\Site;
+use N2ns\Stats\Recording\Page;
 use N2ns\Stats\Recording\Recorder;
 use N2ns\Stats\Support\BotDetector;
 use N2ns\Stats\Support\PathNormalizer;
@@ -29,15 +30,21 @@ class Collector
 
     public function collect(Payload $payload, Request $request): void
     {
+        $this->collectFrom($payload, Client::fromRequest($request));
+    }
+
+    /** Records a payload sent by $client; also used for pageviews and events counted on the server. */
+    public function collectFrom(Payload $payload, Client $client): void
+    {
         try {
-            $this->process($payload, $request);
+            $this->process($payload, $client);
         } catch (Throwable $e) {
             // Only the exception class: messages of query exceptions contain bound values (visitor hashes, paths).
             Log::warning('N2N Stats: failed to record an event', ['type' => $payload->type, 'exception' => $e::class]);
         }
     }
 
-    private function process(Payload $payload, Request $request): void
+    private function process(Payload $payload, Client $client): void
     {
         $site = Site::query()->where('public_id', $payload->site)->first();
         if ($site === null) {
@@ -49,18 +56,14 @@ class Collector
             return;
         }
 
-        // Beacons are no-cors requests: pages with Referrer-Policy no-referrer/same-origin (and sandboxed iframes)
-        // send "Origin: null" and no Referer. A real origin must match; without one only the page URL is checked.
-        $origin = $request->headers->get('Origin');
-        $origin = ($origin === null || $origin === '' || $origin === 'null') ? $request->headers->get('Referer') : $origin;
-        if (is_string($origin) && $origin !== '' && $origin !== 'null') {
-            $originHost = $this->publicHost($origin);
+        if ($client->origin !== null) {
+            $originHost = $this->publicHost($client->origin);
             if ($originHost === null || ! $site->allowsHost($originHost)) {
                 return;
             }
         }
 
-        $ip = (string) $request->ip();
+        $ip = $client->ip;
         $limits = (array) config('stats.rate_limits', []);
         if (! $this->allow('stats-collect-site:'.$site->id, (int) ($limits['per_site_per_minute'] ?? 3000))) {
             return;
@@ -72,7 +75,7 @@ class Collector
             return;
         }
 
-        $userAgent = (string) $request->userAgent();
+        $userAgent = $client->userAgent;
         if ($this->bots->isBot($userAgent)) {
             return;
         }
@@ -84,27 +87,28 @@ class Collector
         }
 
         $path = $this->paths->normalize($payload->url);
-        if ($path === null) {
+        if ($path === null || $site->excludesPath($path)) {
             return;
         }
 
         if ($payload->type === 'pageview') {
             $source = $this->sources->classify($payload->url, $payload->referrer, fn (string $host): bool => $site->allowsHost($host));
-            $this->recorder->recordPageview($site, $visitorHash, $now, $path, $payload->url, $source, $this->dimensions($request, $userAgent, $payload->width));
+            $page = new Page($path, $payload->title, $payload->pageType, $payload->group, $site->localeOf($path));
+            $this->recorder->recordPageview($site, $visitorHash, $now, $page, $source, $this->dimensions($client, $userAgent, $payload->width));
 
             return;
         }
 
-        if ($payload->type === 'event') {
-            $this->recorder->recordEvent($site, $visitorHash, $now, 'custom', (string) $payload->name, $payload->label, $path);
-
+        $target = $payload->target === null ? null : $this->paths->cleanUrl($payload->target);
+        if ($payload->type !== 'event' && $target === null) {
             return;
         }
-
-        $target = $this->paths->cleanUrl((string) $payload->label);
-        if ($target !== null) {
-            $this->recorder->recordEvent($site, $visitorHash, $now, $payload->type === 'download' ? 'download' : 'outbound', '', $target, $path);
-        }
+        $kind = match ($payload->type) {
+            'event' => 'custom',
+            'download' => 'download',
+            default => 'outbound',
+        };
+        $this->recorder->recordEvent($site, $visitorHash, $now, $kind, (string) $payload->name, $payload->label, $target, $path);
     }
 
     /** Lower-case host of a URL; null when missing, localhost or an IP address. */
@@ -145,14 +149,14 @@ class Collector
     }
 
     /** @return array{country: string, device: string, browser: string, os: string, language: string} */
-    private function dimensions(Request $request, string $userAgent, ?int $width): array
+    private function dimensions(Client $client, string $userAgent, ?int $width): array
     {
-        $country = trim((string) $request->headers->get('CF-IPCountry'));
+        $country = trim((string) $client->country);
         if (preg_match('/^[A-Z]{2}$/', $country) !== 1 || in_array($country, ['XX', 'T1'], true)) {
             $country = 'unknown';
         }
 
-        $first = explode(',', (string) $request->headers->get('Accept-Language'))[0];
+        $first = explode(',', (string) $client->acceptLanguage)[0];
         $language = strtolower(trim((preg_split('/[-_;]/', $first) ?: [''])[0]));
         if (preg_match('/^[a-z]{2,3}$/', $language) !== 1) {
             $language = 'unknown';

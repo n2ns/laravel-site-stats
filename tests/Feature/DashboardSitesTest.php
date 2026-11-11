@@ -110,3 +110,76 @@ it('rotates the server key and shows it only once', function () {
     $this->post(route('stats.sites.key', ['publicId' => $site->public_id]));
     expect($site->refresh()->verifiesServerKey($m[1]))->toBeFalse();
 });
+
+it('creates a site with language versions, excluded paths and public counts', function () {
+    $this->post(route('stats.sites.store'), [
+        'name' => 'Docs',
+        'domains' => 'example.com',
+        'timezone' => 'UTC',
+        'locales' => "EN\r\nzh-CN\n\nen\npt-br",
+        'default_locale' => ' EN ',
+        'exclude_paths' => "/admin/*\n\n/Preview\n/admin/*",
+        'public_counts' => '1',
+    ])->assertRedirect(route('stats.sites.index'));
+
+    $site = Site::query()->sole();
+    expect($site->locales)->toBe(['en', 'zh-cn', 'pt-br'])
+        ->and($site->default_locale)->toBe('en')
+        ->and($site->exclude_paths)->toBe(['/admin/*', '/Preview'])
+        ->and($site->public_counts)->toBeTrue();
+});
+
+it('stores empty language versions and excluded paths, no default locale and public counts off', function () {
+    $site = S::site('Docs', ['locales' => ['en'], 'default_locale' => 'en', 'exclude_paths' => ['/x'], 'public_counts' => true]);
+
+    $this->put(route('stats.sites.update', ['publicId' => $site->public_id]), [
+        'name' => 'Docs', 'domains' => 'example.com', 'timezone' => 'UTC', 'locales' => '', 'default_locale' => '', 'exclude_paths' => " \n",
+    ])->assertRedirect(route('stats.sites.index'));
+
+    $site->refresh();
+    expect($site->locales)->toBe([])
+        ->and($site->default_locale)->toBeNull()
+        ->and($site->exclude_paths)->toBe([])
+        ->and($site->public_counts)->toBeFalse();
+});
+
+it('rejects invalid language versions, default locale and excluded paths', function (array $input, string $field, string $message) {
+    $this->followingRedirects()->from(route('stats.sites.index'))
+        ->post(route('stats.sites.store'), $input + ['name' => 'X', 'domains' => 'example.com', 'timezone' => 'UTC'])
+        ->assertSee($message, false);
+    $this->from(route('stats.sites.index'))
+        ->post(route('stats.sites.store'), $input + ['name' => 'X', 'domains' => 'example.com', 'timezone' => 'UTC'])
+        ->assertSessionHasErrorsIn('create', $field);
+    expect(Site::query()->count())->toBe(0);
+})->with([
+    'locale word' => [['locales' => 'english'], 'locales', '“english” is not a language code'],
+    'locale with underscore' => [['locales' => "en\nzh_cn"], 'locales', '“zh_cn” is not a language code'],
+    'locale region too long' => [['locales' => 'en-abcdefghi'], 'locales', '“en-abcdefghi” is not a language code'],
+    'too many locales' => [['locales' => implode("\n", array_map(fn ($i) => 'l'.chr(96 + $i), range(1, 21)))], 'locales', 'Enter at most 20 language versions.'],
+    'default locale' => [['default_locale' => 'en_US'], 'default_locale', '“en_us” is not a language code'],
+    'path without slash' => [['exclude_paths' => 'admin/*'], 'exclude_paths', '“admin/*” must start with / and be at most 200 characters long.'],
+    'path too long' => [['exclude_paths' => '/'.str_repeat('a', 200)], 'exclude_paths', 'must start with / and be at most 200 characters long.'],
+    'too many paths' => [['exclude_paths' => implode("\n", array_map(fn ($i) => "/p{$i}", range(1, 51)))], 'exclude_paths', 'Enter at most 50 excluded paths.'],
+]);
+
+it('shows the new fields with the current values and explains public counts', function () {
+    S::site('Docs', ['locales' => ['en', 'zh-cn'], 'default_locale' => 'en', 'exclude_paths' => ['/admin/*'], 'public_counts' => true]);
+
+    $this->get(route('stats.sites.index'))
+        ->assertOk()
+        ->assertSee("en\nzh-cn", false)
+        ->assertSee('name="default_locale" maxlength="16" value="en"', false)
+        ->assertSee('/admin/*')
+        ->assertSee('name="public_counts" value="1" aria-describedby', false)
+        ->assertSee('checked', false)
+        ->assertSee('public counts on')
+        ->assertSee('Lets anyone, without a token, read the all-time pageview counts');
+});
+
+it('keeps the entered values after a validation error', function () {
+    $this->followingRedirects()->from(route('stats.sites.index'))
+        ->post(route('stats.sites.store'), ['name' => 'X', 'domains' => 'example.com', 'timezone' => 'UTC', 'locales' => "en\nbad_one", 'exclude_paths' => '/keep-me', 'public_counts' => '1'])
+        ->assertSee("en\nbad_one", false)
+        ->assertSee('/keep-me')
+        ->assertSee('aria-invalid="true"', false);
+});

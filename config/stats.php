@@ -4,7 +4,7 @@ return [
 
     /*
     | 'host' stores data and serves the collector, dashboard and API.
-    | 'client' only sends server-side events (AI fetches) to a host and creates no tables.
+    | 'client' only sends server-side events (AI fetches, page views, events) to a host and creates no tables.
     */
     'mode' => env('STATS_MODE', 'host'),
 
@@ -22,7 +22,7 @@ return [
     'dashboard_middleware' => ['web'],
 
     /*
-    | Host mode: public id of the site whose AI fetches the TrackAiFetches middleware counts. When null,
+    | Host mode: public id of the site the TrackAiFetches and TrackPageviews middleware and Stats::event() count for. When null,
     | the site is found by the request's Host header (only safe when the web server rejects unknown hosts).
     */
     'host_site' => env('STATS_HOST_SITE'),
@@ -38,6 +38,7 @@ return [
         'per_visitor_per_minute' => 60,
         'server_events_per_minute' => 600,
         'api_per_minute' => 60,
+        'public_per_minute' => 120, // public counts endpoint, per IP (IPv6 per /64)
     ],
 
     'bot_user_agents' => [
@@ -54,6 +55,9 @@ return [
         'oai-searchbot', 'oai-adsbot', 'gptbot', 'chatgpt-user', 'claudebot', 'claude-user',
         'claude-searchbot', 'perplexitybot', 'perplexity-user',
     ],
+
+    // AI fetchers that fetch a page because a person asked the assistant about it (the others are crawlers).
+    'ai_user_fetchers' => ['chatgpt-user', 'claude-user', 'perplexity-user'],
 
     // Referrer host substrings.
     'search_hosts' => ['google.', 'bing.com', 'duckduckgo.com', 'yahoo.', 'yandex.', 'baidu.', 'naver.', 'sogou.'],

@@ -17,6 +17,10 @@ return new class extends Migration
             $t->json('domains');
             $t->string('timezone', 64)->default('UTC');
             $t->string('server_key_hash', 64)->nullable();
+            $t->json('locales')->nullable();
+            $t->string('default_locale', 16)->nullable();
+            $t->json('exclude_paths')->nullable();
+            $t->boolean('public_counts')->default(false);
             $t->timestamps();
         });
 
@@ -54,6 +58,7 @@ return new class extends Migration
             $t->string('entry_path_hash', 64);
             $t->string('exit_path_hash', 64);
             $t->string('source_key', 64);
+            $t->string('dimensions', 512);
             $t->primary(['site_id', 'visitor_hash', 'started_at']);
             $t->index(['site_id', 'last_seen_at']);
             $t->index('last_seen_at');
@@ -70,6 +75,7 @@ return new class extends Migration
             $t->unsignedBigInteger('bounces')->default(0);
             $t->unsignedBigInteger('duration_seconds')->default(0);
             $t->unsignedBigInteger('events')->default(0);
+            $t->unsignedBigInteger('outbound')->default(0);
             $t->unique(['site_id', 'date']);
         });
 
@@ -83,6 +89,12 @@ return new class extends Migration
             $t->unsignedBigInteger('visitors')->default(0);
             $t->unsignedBigInteger('entries')->default(0);
             $t->unsignedBigInteger('exits')->default(0);
+            $t->unsignedBigInteger('entry_pageviews')->default(0);
+            $t->unsignedBigInteger('entry_outbound')->default(0);
+            $t->unsignedBigInteger('entry_events')->default(0);
+            $t->string('title', 200)->nullable();
+            $t->string('page_type', 40)->nullable();
+            $t->string('content_group', 120)->nullable();
             $t->unique(['site_id', 'date', 'path_hash']);
         });
 
@@ -101,6 +113,8 @@ return new class extends Migration
             $t->unsignedBigInteger('visitors')->default(0);
             $t->unsignedBigInteger('pageviews')->default(0);
             $t->unsignedBigInteger('bounces')->default(0);
+            $t->unsignedBigInteger('outbound')->default(0);
+            $t->unsignedBigInteger('events')->default(0);
             $t->unique(['site_id', 'date', 'source_key']);
         });
 
@@ -112,6 +126,7 @@ return new class extends Migration
             $t->string('value', 64);
             $t->unsignedBigInteger('visits')->default(0);
             $t->unsignedBigInteger('visitors')->default(0);
+            $t->unsignedBigInteger('pageviews')->default(0);
             $t->unique(['site_id', 'date', 'dimension', 'value']);
         });
 
@@ -121,20 +136,52 @@ return new class extends Migration
             $t->date('date');
             $t->string('kind', 20);
             $t->string('name', 64);
+            $t->string('label', 120)->nullable();
+            $t->string('label_hash', 64);
             $t->string('target', 2048)->nullable();
             $t->string('target_hash', 64);
             $t->string('path', 512)->nullable();
             $t->string('path_hash', 64);
             $t->unsignedBigInteger('count')->default(0);
             $t->unsignedBigInteger('visitors')->default(0);
-            $t->unique(['site_id', 'date', 'kind', 'name', 'target_hash', 'path_hash'], 'stats_daily_events_unique');
+            $t->unique(['site_id', 'date', 'kind', 'name', 'label_hash', 'target_hash', 'path_hash'], 'stats_daily_events_unique');
+        });
+
+        // Visits by entry page and source (landing pages per campaign, search engine, AI assistant).
+        Schema::create($p.'daily_entries', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('site_id');
+            $t->date('date');
+            $t->string('path', 512);
+            $t->string('path_hash', 64);
+            $t->string('source_key', 64);
+            $t->string('source_type', 20);
+            $t->string('source', 191)->nullable();
+            $t->string('utm_campaign', 128)->nullable();
+            $t->unsignedBigInteger('visits')->default(0);
+            $t->unsignedBigInteger('visitors')->default(0);
+            $t->unique(['site_id', 'date', 'path_hash', 'source_key']);
+        });
+
+        // Page-to-page moves within a visit.
+        Schema::create($p.'daily_transitions', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('site_id');
+            $t->date('date');
+            $t->string('from_path', 512);
+            $t->string('from_hash', 64);
+            $t->string('to_path', 512);
+            $t->string('to_hash', 64);
+            $t->unsignedBigInteger('count')->default(0);
+            $t->unsignedBigInteger('visitors')->default(0);
+            $t->unique(['site_id', 'date', 'from_hash', 'to_hash']);
         });
     }
 
     public function down(): void
     {
         $p = config('stats.table_prefix', 'stats_');
-        foreach (['daily_events', 'daily_dimensions', 'daily_sources', 'daily_pages', 'daily_totals', 'visits', 'uniques', 'salts', 'api_tokens', 'sites'] as $table) {
+        foreach (['daily_transitions', 'daily_entries', 'daily_events', 'daily_dimensions', 'daily_sources', 'daily_pages', 'daily_totals', 'visits', 'uniques', 'salts', 'api_tokens', 'sites'] as $table) {
             Schema::dropIfExists($p.$table);
         }
     }

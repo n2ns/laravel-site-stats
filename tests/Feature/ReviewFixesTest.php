@@ -65,7 +65,9 @@ it('counts new values beyond the daily row cap under (other)', function () {
         reviewSend($this->site, 'https://example.com'.$path, ['HTTP_ORIGIN' => 'https://example.com', 'REMOTE_ADDR' => '198.51.100.'.($i + 10)]);
     }
 
-    $pages = DB::table('stats_daily_pages')->orderBy('path')->pluck('pageviews', 'path')->map(fn ($v) => (int) $v)->all();
+    // Compared without order: how '(other)' sorts against '/a' depends on the database collation.
+    $pages = DB::table('stats_daily_pages')->pluck('pageviews', 'path')->map(fn ($v) => (int) $v)->all();
+    ksort($pages);
     expect($pages)->toBe(['(other)' => 2, '/a' => 1, '/b' => 1]);
 });
 

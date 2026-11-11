@@ -36,7 +36,7 @@ class TrackAiFetches
     public function terminate(Request $request, Response $response): void
     {
         try {
-            if (! $request->isMethod('GET') || $response->getStatusCode() < 200 || $response->getStatusCode() >= 300) {
+            if (! $request->isMethod('GET') || $response->getStatusCode() < 200 || $response->getStatusCode() >= 400) {
                 return;
             }
 
@@ -74,7 +74,7 @@ class TrackAiFetches
         }
         RateLimiter::hit($key, 60);
 
-        $this->recorder->recordEvent($site, null, CarbonImmutable::now(), 'ai_fetch', $fetcher, null, $path);
+        $this->recorder->recordEvent($site, null, CarbonImmutable::now(), 'ai_fetch', $fetcher, null, null, $path);
     }
 
     private function send(string $fetcher, string $path): void

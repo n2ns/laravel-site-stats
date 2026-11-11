@@ -32,11 +32,33 @@
   function linkUrl(a) {
     return a.protocol + '//' + a.host + a.pathname;
   }
+  // Resolves a URL against the page; scheme://host/path for http(s), otherwise undefined.
+  function targetUrl(href) {
+    if (href == null) return undefined;
+    var a = d.createElement('a');
+    a.href = String(href);
+    return /^https?:$/.test(a.protocol) ? linkUrl(a) : undefined;
+  }
+  // Text the collector accepts: no control characters, trimmed, at most max characters; undefined when empty.
+  function text(value, max) {
+    if (value == null) return undefined;
+    value = String(value).replace(/[\x00-\x1f\x7f]+/g, ' ').trim().slice(0, max).replace(/[\ud800-\udbff]$/, '');
+    return value || undefined;
+  }
+  function meta(name) {
+    var m = d.querySelector('meta[name="n2n-stats:' + name + '"]');
+    return m && (m.getAttribute('content') || '');
+  }
+  function labelOf(el) {
+    var tagged = el.closest('[data-stats-label]');
+    return tagged ? text(tagged.getAttribute('data-stats-label'), 120) : undefined;
+  }
 
-  function send(type, extra) {
+  // path: the page the data belongs to (default the current one).
+  function send(type, extra, path) {
     try {
-      if (blocked || !site) return;
-      var path = loc.pathname;
+      if (blocked || !site || meta('skip') != null) return;
+      path = path || loc.pathname;
       for (var i = 0; i < excluded.length; i++) if (excluded[i].test(path)) return;
       var data = { s: site, t: type, u: pageUrl(), w: w.screen ? w.screen.width : undefined };
       for (var k in extra) data[k] = extra[k];
@@ -51,15 +73,33 @@
     } catch (e) { /* never break the page */ }
   }
 
+  // data-pageviews="off": page views are counted on the server; the script only sends events.
+  var pageviews = attr('data-pageviews') !== 'off';
   var lastPath;
-  function pageview() {
-    if (loc.pathname === lastPath) return;
-    lastPath = loc.pathname;
-    send('pageview', { r: d.referrer || undefined });
+  // deferred: after a history change, wait until the router has rendered the new page (title, meta tags).
+  function pageview(deferred) {
+    if (!pageviews) return;
+    var path = loc.pathname;
+    if (path === lastPath) return;
+    lastPath = path;
+    var url = pageUrl();
+    var go = function () {
+      var type = meta('type');
+      send('pageview', {
+        u: url,
+        r: d.referrer || undefined,
+        pt: text(d.title, 200),
+        py: type && /^[a-z0-9_-]{1,40}$/.test(type) ? type : undefined,
+        pg: text(meta('group'), 120)
+      }, path);
+    };
+    if (deferred) w.setTimeout(go, 0); else go();
   }
+  function navigated() { pageview(true); }
 
   function track(name, options) {
-    send('event', { n: String(name), l: options && options.label != null ? String(options.label) : undefined });
+    options = options || {};
+    send('event', { n: String(name), l: text(options.label, 120), g: targetUrl(options.target) });
   }
 
   function onClick(e) {
@@ -68,15 +108,23 @@
       if (!el) return;
       if (e.type === 'click' ? e.button !== 0 : e.button !== 1) return;
       var tagged = e.type === 'click' && el.closest('[data-stats-event]');
-      if (tagged) track(tagged.getAttribute('data-stats-event'), { label: tagged.getAttribute('data-stats-label') });
+      if (tagged) {
+        var ta = tagged.closest('a[href]');
+        send('event', {
+          n: tagged.getAttribute('data-stats-event'),
+          l: text(tagged.getAttribute('data-stats-label'), 120),
+          g: ta && /^https?:$/.test(ta.protocol) ? linkUrl(ta) : undefined
+        });
+      }
       var a = el.closest('a[href]');
       if (!a || !/^https?:$/.test(a.protocol)) return;
       var file = a.pathname.split('/').pop();
       var dot = file.lastIndexOf('.');
+      var link = { g: linkUrl(a), l: labelOf(a) };
       if (dot > 0 && exts.indexOf(file.slice(dot + 1).toLowerCase()) >= 0) {
-        send('download', { l: linkUrl(a) });
+        send('download', link);
       } else if (a.hostname !== loc.hostname) {
-        send('outbound', { l: linkUrl(a) });
+        send('outbound', link);
       }
     } catch (err) { /* ignore */ }
   }
@@ -85,11 +133,11 @@
     var original = w.history[method];
     w.history[method] = function () {
       var result = original.apply(this, arguments);
-      pageview();
+      navigated();
       return result;
     };
   });
-  w.addEventListener('popstate', pageview);
+  w.addEventListener('popstate', navigated);
   d.addEventListener('click', onClick, true);
   d.addEventListener('auxclick', onClick, true);
 

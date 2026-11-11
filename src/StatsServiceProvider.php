@@ -35,6 +35,7 @@ class StatsServiceProvider extends ServiceProvider
 
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'stats');
+        $this->loadTranslationsFrom(__DIR__.'/../lang', 'stats');
 
         // Hosts grant access with Gate::define('viewStats', ...); denied by default.
         if (! Gate::has('viewStats')) {

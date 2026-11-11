@@ -14,11 +14,26 @@ it('parses a pageview', function () {
     expect($p)->toEqual(new Payload(PAYLOAD_SITE, 'pageview', 'https://example.com/a?x=1', 'https://google.com/', null, null, 1280));
 });
 
+it('parses page details', function () {
+    $p = Payload::fromJson(payloadJson(['pt' => 'Pricing – Example', 'py' => 'product', 'pg' => 'plan-pro']));
+    expect($p?->title)->toBe('Pricing – Example')
+        ->and($p?->pageType)->toBe('product')
+        ->and($p?->group)->toBe('plan-pro');
+});
+
 it('parses events, outbound and download', function () {
-    expect(Payload::fromJson(payloadJson(['t' => 'event', 'n' => 'signup.click', 'l' => 'Hero button'])))
-        ->toEqual(new Payload(PAYLOAD_SITE, 'event', 'https://example.com/a?x=1', null, 'signup.click', 'Hero button'))
-        ->and(Payload::fromJson(payloadJson(['t' => 'outbound', 'l' => 'https://other.org/x', 'r' => 'https://ignored.com/']))?->referrer)->toBeNull()
-        ->and(Payload::fromJson(payloadJson(['t' => 'download', 'l' => 'https://example.com/app.apk']))?->label)->toBe('https://example.com/app.apk');
+    expect(Payload::fromJson(payloadJson(['t' => 'event', 'n' => 'signup.click', 'l' => 'Hero button', 'g' => 'https://example.com/checkout'])))
+        ->toEqual(new Payload(PAYLOAD_SITE, 'event', 'https://example.com/a?x=1', null, 'signup.click', 'Hero button', null, 'https://example.com/checkout'))
+        ->and(Payload::fromJson(payloadJson(['t' => 'event', 'n' => 'x']))?->target)->toBeNull()
+        ->and(Payload::fromJson(payloadJson(['t' => 'outbound', 'g' => 'https://other.org/x', 'l' => 'pairdock', 'r' => 'https://ignored.com/'])))
+        ->toEqual(new Payload(PAYLOAD_SITE, 'outbound', 'https://example.com/a?x=1', null, null, 'pairdock', null, 'https://other.org/x'))
+        ->and(Payload::fromJson(payloadJson(['t' => 'download', 'g' => 'https://example.com/app.apk']))?->target)->toBe('https://example.com/app.apk')
+        ->and(Payload::fromJson(payloadJson(['t' => 'outbound', 'g' => 'https://other.org/x', 'pt' => 'ignored']))?->title)->toBeNull();
+});
+
+it('parses the same fields from an array', function () {
+    expect(Payload::fromArray(['s' => PAYLOAD_SITE, 't' => 'pageview', 'u' => 'https://example.com/', 'py' => 'home'])?->pageType)->toBe('home')
+        ->and(Payload::fromArray(['s' => PAYLOAD_SITE, 't' => 'pageview']))->toBeNull();
 });
 
 it('rejects malformed payloads', function (string $body) {
@@ -40,7 +55,15 @@ it('rejects malformed payloads', function (string $body) {
     'event bad name' => [payloadJson(['t' => 'event', 'n' => 'Sign Up'])],
     'event long label' => [payloadJson(['t' => 'event', 'n' => 'x', 'l' => str_repeat('a', 121)])],
     'outbound without url' => [payloadJson(['t' => 'outbound'])],
-    'outbound bad url' => [payloadJson(['t' => 'outbound', 'l' => 'mailto:a@b.c'])],
+    'outbound url in label only' => [payloadJson(['t' => 'outbound', 'l' => 'https://other.org/x'])],
+    'outbound bad url' => [payloadJson(['t' => 'outbound', 'g' => 'mailto:a@b.c'])],
+    'event bad target' => [payloadJson(['t' => 'event', 'n' => 'x', 'g' => '/checkout'])],
+    'outbound long label' => [payloadJson(['t' => 'outbound', 'g' => 'https://o.org/', 'l' => str_repeat('a', 121)])],
+    'label with control character' => [payloadJson(['t' => 'event', 'n' => 'x', 'l' => "a\nb"])],
+    'long title' => [payloadJson(['pt' => str_repeat('a', 201)])],
+    'bad page type' => [payloadJson(['py' => 'Product Page'])],
+    'long group' => [payloadJson(['pg' => str_repeat('a', 121)])],
+    'title not a string' => [payloadJson(['pt' => 5])],
     'width string' => [payloadJson(['w' => '1280'])],
     'width too big' => [payloadJson(['w' => 10001])],
     'width negative' => [payloadJson(['w' => -1])],

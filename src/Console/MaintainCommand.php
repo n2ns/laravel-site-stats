@@ -33,7 +33,7 @@ class MaintainCommand extends Command
         $retention = config('stats.retention_days');
         if ($retention !== null && $retention !== '' && (int) $retention > 0) {
             $before = $now->utc()->subDays((int) $retention)->toDateString();
-            foreach (['daily_totals', 'daily_pages', 'daily_sources', 'daily_dimensions', 'daily_events'] as $table) {
+            foreach (['daily_totals', 'daily_pages', 'daily_sources', 'daily_dimensions', 'daily_events', 'daily_entries', 'daily_transitions'] as $table) {
                 $deleted = DB::table(Tables::name($table))->where('date', '<', $before)->delete();
                 $this->info("Deleted {$table} rows: {$deleted}");
             }

@@ -10,7 +10,7 @@ final readonly class Period
 {
     public const MAX_DAYS = 366;
 
-    public const PRESETS = ['today', 'yesterday', '7d', '30d', '90d', 'month', 'last_month'];
+    public const PRESETS = ['today', 'yesterday', '7d', '15d', '30d', '90d', 'month', 'last_month'];
 
     public function __construct(public CarbonImmutable $from, public CarbonImmutable $to) {}
 
@@ -44,6 +44,7 @@ final readonly class Period
             'today' => new self($today, $today),
             'yesterday' => new self($today->subDay(), $today->subDay()),
             '7d' => self::lastDays(7, $timezone),
+            '15d' => self::lastDays(15, $timezone),
             '30d' => self::lastDays(30, $timezone),
             '90d' => self::lastDays(90, $timezone),
             'month' => new self($today->startOfMonth(), $today),
@@ -55,6 +56,37 @@ final readonly class Period
     public function days(): int
     {
         return (int) round($this->from->diffInDays($this->to, true)) + 1;
+    }
+
+    /**
+     * The two periods compared on the dashboard and in the summary: complete days only. When this period includes
+     * $today (still in progress), the current side runs to yesterday; "today" alone is compared as yesterday
+     * against the day before.
+     *
+     * @return array{0: self, 1: self} [current, previous]
+     */
+    public function comparison(CarbonImmutable $today): array
+    {
+        $today = $today->startOfDay();
+        if ($this->to->lessThan($today)) {
+            return [$this, $this->previous()];
+        }
+        $yesterday = $today->subDay();
+        $current = $this->from->greaterThanOrEqualTo($today) ? new self($yesterday, $yesterday) : new self($this->from, $yesterday);
+
+        return [$current, $current->previous()];
+    }
+
+    /** Whether this period includes $today, whose numbers are still growing. */
+    public function isPartial(CarbonImmutable $today): bool
+    {
+        return $this->to->greaterThanOrEqualTo($today->startOfDay());
+    }
+
+    /** Today's date in $timezone (midnight, in the UTC-based form all periods use). */
+    public static function todayIn(string $timezone): CarbonImmutable
+    {
+        return self::today($timezone);
     }
 
     /** The period of equal length that ends the day before this one starts. */
