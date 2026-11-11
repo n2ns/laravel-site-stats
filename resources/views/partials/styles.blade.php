@@ -297,6 +297,12 @@
 .stats-dash .site-form .error{border:1px solid var(--bad);border-radius:var(--radius-sm);padding:var(--space-2) var(--space-3);font-size:var(--fs-sm)}
 .stats-dash .site-form .error ul{margin:0;padding-left:18px}
 .stats-dash .site-card>details>summary{font-weight:600;margin-top:var(--space-2)}
+.stats-dash details.new-site>summary.card-head{width:auto;color:var(--text);font-size:inherit;list-style:none;justify-content:flex-start;align-items:center;gap:var(--space-2)}
+.stats-dash details.new-site>summary.card-head::-webkit-details-marker{display:none}
+.stats-dash details.new-site>summary.card-head::before{content:"";width:7px;height:7px;border:solid var(--text-2);border-width:0 2px 2px 0;transform:rotate(-45deg);transition:transform .15s}
+.stats-dash details.new-site[open]>summary.card-head::before{transform:rotate(45deg)}
+.stats-dash details.new-site:not([open]){padding-bottom:0}
+.stats-dash details.new-site:not([open])>summary.card-head{margin-bottom:0;border-bottom:0;border-radius:var(--radius)}
 .stats-dash .site-card>details[open]>summary{margin-bottom:var(--space-4)}
 .stats-dash .key-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--space-3)}
 .stats-dash .key-row p{margin:0;font-size:var(--fs-sm);color:var(--text-2);flex:1 1 280px}

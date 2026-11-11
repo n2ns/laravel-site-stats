@@ -29,7 +29,8 @@ return [
 
     /*
     | Show the dashboard and site pages inside the host's own admin layout instead of standalone (null):
-    |   ['view' => 'admin.layout', 'section' => 'content', 'title_sections' => ['title']]  a layout to @extends
+    |   ['view' => 'admin.layout', 'section' => 'content', 'title_sections' => ['title']]  a layout to @extends;
+    |     'sections' => ['page-title' => 'Analytics'] fills other sections of it with fixed text
     |   ['component' => 'layouts.app']  a layout component; the page goes in its slot, the title in its title attribute
     | The pages keep the light theme there.
     */

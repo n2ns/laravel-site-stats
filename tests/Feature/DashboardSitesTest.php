@@ -197,3 +197,17 @@ it('lays out each site as a card with a copyable snippet and labelled fields wit
         ->assertSee('<p class="help" id="domains-help-new">Domains, one per line', false)
         ->assertSee('<a href="'.route('stats.sites.index').'" aria-current="page">Site settings</a>', false);
 });
+
+it('folds the new site form unless there is no site yet or it was sent with errors', function () {
+    $open = function (): bool {
+        preg_match('/<details class="card new-site" id="new-site"[^>]*>/', $this->get('/stats/manage/sites')->assertOk()->getContent(), $tag);
+
+        return str_contains($tag[0], ' open');
+    };
+
+    expect($open())->toBeTrue();
+    S::site('Alpha');
+    expect($open())->toBeFalse();
+    $this->from('/stats/manage/sites')->post('/stats/manage/sites', ['name' => ''])->assertSessionHasErrorsIn('create', 'name');
+    expect($open())->toBeTrue();
+});

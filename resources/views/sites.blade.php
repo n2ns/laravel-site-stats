@@ -59,13 +59,19 @@
 <div class="card"><p class="empty">{{ __('stats::sites.none') }}</p></div>
 @endforelse
 
-<section class="card" id="new-site" aria-labelledby="new-site-title">
-<div class="card-head"><h2 id="new-site-title">{{ __('stats::sites.new_site') }}</h2></div>
+{{-- Folded unless there is no site yet or it came back with errors; the New site button opens it. --}}
+<details class="card new-site" id="new-site" aria-labelledby="new-site-title"@if ($sites->isEmpty() || $errors->getBag('create')->any()) open @endif>
+<summary class="card-head"><h2 id="new-site-title">{{ __('stats::sites.new_site') }}</h2></summary>
 @include('stats::partials.site-form', ['site' => null, 'bag' => 'create', 'action' => route('stats.sites.store'), 'method' => 'POST', 'submit' => __('stats::sites.create')])
-</section>
+</details>
 </div>
 <script>
 (function () {
+  var newSite = document.getElementById('new-site');
+  document.querySelectorAll('a[href="#new-site"]').forEach(function (link) {
+    link.addEventListener('click', function () { newSite.open = true; });
+  });
+
   var copied = @json(__('stats::sites.copied')), failed = @json(__('stats::sites.copy_failed'));
   document.querySelectorAll('[data-copy]').forEach(function (button) {
     var source = button.closest('.copy-box').querySelector('pre');

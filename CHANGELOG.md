@@ -6,6 +6,16 @@ All notable changes to N2N Stats are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `dashboard_layout` for a layout to extend takes `sections`: fixed text for other sections of the host layout, such
+  as its page header.
+
+### Changed
+
+- The new site form on the Site settings page is folded until opened (with the New site button or its heading); it
+  stays open when there is no site yet or the form came back with errors.
+
 ## [0.1.7] - 2026-11-12
 
 ### Added

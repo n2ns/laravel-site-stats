@@ -55,3 +55,12 @@ it('puts the pages into a host layout component, with the title as its title att
         ->assertDontSee('class="stats-back"', false)
         ->assertDontSee('<header class="appbar">', false);
 });
+
+it('fills fixed text into other sections of the host layout', function () {
+    config(['stats.dashboard_layout' => ['view' => 'host-admin', 'section' => 'body', 'title_sections' => ['title'], 'sections' => ['page-title' => 'Analytics']]]);
+    $site = S::site('Alpha');
+
+    $this->get('/stats/sites/'.$site->public_id)->assertOk()
+        ->assertSee('<title>Alpha - Host admin</title>', false)
+        ->assertSee('<h1 class="host-title">Analytics</h1>', false);
+});
