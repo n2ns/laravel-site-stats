@@ -3,6 +3,7 @@
 namespace N2ns\Stats\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use N2ns\Stats\Support\Tables;
 
@@ -20,6 +21,25 @@ use N2ns\Stats\Support\Tables;
  */
 class Site extends Model
 {
+    /** Limits and formats of the site settings, shared by the dashboard, the Filament resource and stats:site. */
+    public const MAX_DOMAINS = 50;
+
+    public const MAX_LOCALES = 20;
+
+    public const MAX_EXCLUDE_PATHS = 50;
+
+    public const MAX_PATH_LENGTH = 200;
+
+    private const LOCALE = '/^[a-z]{2,3}(-[a-z0-9]{2,8})?$/';
+
+    private const HOSTNAME = '/^(\*\.)?(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/';
+
+    /** Tables with per-site rows, deleted together with the site. */
+    public const STATISTICS_TABLES = [
+        'uniques', 'visits', 'daily_totals', 'daily_pages', 'daily_sources', 'daily_dimensions', 'daily_events',
+        'daily_entries', 'daily_transitions',
+    ];
+
     protected $guarded = ['id'];
 
     protected $hidden = ['server_key_hash'];
@@ -93,5 +113,43 @@ class Site extends Model
         }
 
         return false;
+    }
+
+    /** A lower-case hostname with at least two labels, optionally starting with "*."; not an IP address. */
+    public static function isValidDomain(string $domain): bool
+    {
+        return preg_match(self::HOSTNAME, $domain) === 1;
+    }
+
+    /** A lower-case URL path prefix of a language version, e.g. "en" or "zh-cn". */
+    public static function isValidLocale(string $locale): bool
+    {
+        return preg_match(self::LOCALE, $locale) === 1;
+    }
+
+    /** An excluded path pattern: starts with "/", at most MAX_PATH_LENGTH characters, no control characters. */
+    public static function isValidExcludePath(string $path): bool
+    {
+        return str_starts_with($path, '/') && mb_strlen($path) <= self::MAX_PATH_LENGTH && preg_match('/[\x00-\x1F\x7F]/', $path) !== 1;
+    }
+
+    /** Replaces the client-mode server key and returns the new key; only its sha256 is stored. */
+    public function rotateServerKey(): string
+    {
+        $key = Str::random(40);
+        $this->forceFill(['server_key_hash' => hash('sha256', $key)])->save();
+
+        return $key;
+    }
+
+    /** Deletes the site with all of its statistics. */
+    public function deleteWithStatistics(): void
+    {
+        DB::transaction(function (): void {
+            foreach (self::STATISTICS_TABLES as $table) {
+                DB::table(Tables::name($table))->where('site_id', $this->id)->delete();
+            }
+            $this->delete();
+        });
     }
 }

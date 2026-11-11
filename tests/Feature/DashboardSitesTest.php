@@ -98,7 +98,7 @@ it('rotates the server key and shows it only once', function () {
 
     $response = $this->post(route('stats.sites.key', ['publicId' => $site->public_id]))->assertOk();
     $response->assertHeader('Cache-Control', 'no-store, private');
-    preg_match('/<pre>([0-9a-f]{48})<\/pre>/', $response->getContent(), $m);
+    preg_match('/<pre>([A-Za-z0-9]{40})<\/pre>/', $response->getContent(), $m);
     expect($m)->toHaveKey(1);
 
     $site->refresh();
@@ -182,4 +182,18 @@ it('keeps the entered values after a validation error', function () {
         ->assertSee("en\nbad_one", false)
         ->assertSee('/keep-me')
         ->assertSee('aria-invalid="true"', false);
+});
+
+it('lays out each site as a card with a copyable snippet and labelled fields with help texts', function () {
+    $site = S::site('Example');
+
+    $this->get(route('stats.sites.index'))
+        ->assertOk()
+        ->assertSee('<section class="card site-card" aria-labelledby="site-'.$site->public_id.'">', false)
+        ->assertSee('<button type="button" class="secondary" data-copy hidden>Copy</button>', false)
+        ->assertSee('navigator.clipboard.writeText', false)
+        ->assertSee('<label for="domains-new">Domains</label>', false)
+        ->assertSee('aria-describedby="domains-help-new"', false)
+        ->assertSee('<p class="help" id="domains-help-new">Domains, one per line', false)
+        ->assertSee('<a href="'.route('stats.sites.index').'" aria-current="page">Sites</a>', false);
 });

@@ -23,7 +23,7 @@
         "pestphp/pest-plugin-laravel": "^3.0|^4.0"
     },
     "suggest": {
-        "filament/filament": "Dashboard widgets for Filament panels (^4.0|^5.0)"
+        "filament/filament": "Statistics page, Sites resource and widgets for Filament panels (^5.0)"
     },
     "autoload": {
         "psr-4": {

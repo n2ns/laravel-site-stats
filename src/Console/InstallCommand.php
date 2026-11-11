@@ -42,7 +42,9 @@ class InstallCommand extends Command
         $this->line('     and page views on the server with '.TrackPageviews::class.' (then not with the script).');
         $this->line('  6. Optional: register N2ns\Stats\Filament\StatsPlugin in your Filament panel.');
         $this->newLine();
-        $this->line('  Dashboard: '.url((string) config('stats.dashboard_path')));
+        if (config('stats.dashboard_enabled', true)) {
+            $this->line('  Dashboard: '.url((string) config('stats.dashboard_path')));
+        }
     }
 
     private function printClientSteps(): void

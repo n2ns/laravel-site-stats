@@ -60,8 +60,10 @@ class StatsServiceProvider extends ServiceProvider
         }
         $collector->prefix((string) config('stats.collector_path'))->group(__DIR__.'/../routes/collector.php');
 
-        Route::middleware(config('stats.dashboard_middleware', ['web']))
-            ->prefix((string) config('stats.dashboard_path'))
-            ->group(__DIR__.'/../routes/dashboard.php');
+        if (config('stats.dashboard_enabled', true)) {
+            Route::middleware(config('stats.dashboard_middleware', ['web']))
+                ->prefix((string) config('stats.dashboard_path'))
+                ->group(__DIR__.'/../routes/dashboard.php');
+        }
     }
 }

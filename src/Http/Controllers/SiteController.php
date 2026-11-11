@@ -11,18 +11,6 @@ use N2ns\Stats\Models\Site;
 
 class SiteController
 {
-    private const MAX_DOMAINS = 50;
-
-    private const MAX_LOCALES = 20;
-
-    private const MAX_EXCLUDE_PATHS = 50;
-
-    private const MAX_PATH_LENGTH = 200;
-
-    private const LOCALE = '/^[a-z]{2,3}(-[a-z0-9]{2,8})?$/';
-
-    private const HOSTNAME = '/^(\*\.)?(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/';
-
     public function index(): View
     {
         return $this->page();
@@ -47,8 +35,7 @@ class SiteController
     public function rotateKey(string $publicId): Response
     {
         $site = $this->site($publicId);
-        $key = bin2hex(random_bytes(24));
-        $site->forceFill(['server_key_hash' => hash('sha256', $key)])->save();
+        $key = $site->rotateServerKey();
 
         return response($this->page(['newKey' => ['site' => $site->public_id, 'key' => $key]]))
             ->header('Cache-Control', 'no-store');
@@ -81,11 +68,11 @@ class SiteController
                 $domains = self::lines((string) $value);
                 if ($domains === []) {
                     $fail($message('domains_empty'));
-                } elseif (count($domains) > self::MAX_DOMAINS) {
-                    $fail($message('domains_max', ['max' => self::MAX_DOMAINS]));
+                } elseif (count($domains) > Site::MAX_DOMAINS) {
+                    $fail($message('domains_max', ['max' => Site::MAX_DOMAINS]));
                 }
                 foreach ($domains as $domain) {
-                    if (preg_match(self::HOSTNAME, $domain) !== 1) {
+                    if (! Site::isValidDomain($domain)) {
                         $fail($message('domain_invalid', ['value' => $domain]));
                     }
                 }
@@ -93,29 +80,29 @@ class SiteController
             'timezone' => ['required', 'string', 'timezone:all'],
             'locales' => ['nullable', 'string', 'max:2000', function (string $attribute, mixed $value, Closure $fail) use ($message): void {
                 $locales = self::lines((string) $value);
-                if (count($locales) > self::MAX_LOCALES) {
-                    $fail($message('locales_max', ['max' => self::MAX_LOCALES]));
+                if (count($locales) > Site::MAX_LOCALES) {
+                    $fail($message('locales_max', ['max' => Site::MAX_LOCALES]));
                 }
                 foreach ($locales as $locale) {
-                    if (preg_match(self::LOCALE, $locale) !== 1) {
+                    if (! Site::isValidLocale($locale)) {
                         $fail($message('locale_invalid', ['value' => $locale]));
                     }
                 }
             }],
             'default_locale' => ['nullable', 'string', 'max:16', function (string $attribute, mixed $value, Closure $fail) use ($message): void {
                 $locale = strtolower(trim((string) $value));
-                if (preg_match(self::LOCALE, $locale) !== 1) {
+                if (! Site::isValidLocale($locale)) {
                     $fail($message('default_locale_invalid', ['value' => $locale]));
                 }
             }],
             'exclude_paths' => ['nullable', 'string', 'max:20000', function (string $attribute, mixed $value, Closure $fail) use ($message): void {
                 $paths = self::lines((string) $value, lower: false);
-                if (count($paths) > self::MAX_EXCLUDE_PATHS) {
-                    $fail($message('paths_max', ['max' => self::MAX_EXCLUDE_PATHS]));
+                if (count($paths) > Site::MAX_EXCLUDE_PATHS) {
+                    $fail($message('paths_max', ['max' => Site::MAX_EXCLUDE_PATHS]));
                 }
                 foreach ($paths as $path) {
-                    if (! str_starts_with($path, '/') || mb_strlen($path) > self::MAX_PATH_LENGTH) {
-                        $fail($message('path_invalid', ['value' => $path, 'max' => self::MAX_PATH_LENGTH]));
+                    if (! Site::isValidExcludePath($path)) {
+                        $fail($message('path_invalid', ['value' => $path, 'max' => Site::MAX_PATH_LENGTH]));
                     }
                 }
             }],

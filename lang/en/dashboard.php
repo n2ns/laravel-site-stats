@@ -34,9 +34,12 @@ return [
         'day' => 'MMM D',
         'day_year' => 'MMM D, YYYY',
         'day_only' => 'D',
+        'weekday' => 'ddd, MMM D',
     ],
 
     'summary' => 'Summary',
+    'more_metrics' => 'More metrics',
+    'vs_previous' => 'vs previous days',
     'kpis' => [
         'visitors' => 'Visitors',
         'visits' => 'Visits',
@@ -45,6 +48,7 @@ return [
         'views_per_visit' => 'Views per visit',
         'bounce_rate' => 'Bounce rate',
         'avg_duration_seconds' => 'Avg. visit duration',
+        'avg_page_seconds' => 'Avg. time on page',
         'events' => 'Events',
         'outbound' => 'Outbound clicks',
         'realtime' => 'Realtime',
@@ -58,6 +62,8 @@ return [
         'aria' => 'Line chart of daily :metrics; the data table below lists the values.',
         'table' => 'Data table',
         'date' => 'Date',
+        'metric' => 'Chart metric',
+        'explore' => ':title: use the left and right arrow keys to read the values of each day.',
     ],
     'metrics' => [
         'visitors' => 'Visitors',
@@ -93,4 +99,8 @@ return [
     'sort' => 'Sort by :column',
     'donut' => ':title by :metric: share of each item; the legend lists the values.',
     'other' => 'Other',
+    'show_all' => 'Show all :count',
+    'show_top' => 'Show top :count',
+    'details' => 'All columns',
+    'details_table' => ':title, all columns',
 ];

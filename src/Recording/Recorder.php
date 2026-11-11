@@ -20,6 +20,13 @@ class Recorder
 
     private const ATTEMPTS = 3;
 
+    /** Time on page counted per page view at most, so a tab left open does not inflate averages. */
+    public const MAX_PAGE_SECONDS = 1800;
+
+    public const TIME_THRESHOLDS = [10, 30, 60, 180];
+
+    public const SCROLL_THRESHOLDS = [25, 50, 75, 100];
+
     /**
      * @param  array{country: string, device: string, browser: string, os: string, language: string}  $dimensions
      */
@@ -164,6 +171,45 @@ class Recorder
         $this->retry(fn () => DB::table(Tables::name('daily_pages'))
             ->where(['site_id' => $site->id, 'date' => $visitDate, 'path_hash' => (string) $visit->entry_path_hash])
             ->increment('entry_'.$column));
+    }
+
+    /**
+     * Adds a page view's time on page and scroll depth to its page row. A page view may report several times (the
+     * page is hidden, shown again and left); each report carries its totals so far and those already reported, so
+     * the page view is counted once and each threshold is counted when first reached. Also keeps the visit open.
+     */
+    public function recordEngagement(Site $site, string $visitorHash, CarbonImmutable $now, string $path, int $seconds, int $scroll, int $previousSeconds, int $previousScroll): void
+    {
+        $date = $this->localDate($site, $now);
+        $seconds = min($seconds, self::MAX_PAGE_SECONDS);
+        $previousSeconds = min($previousSeconds, $seconds);
+
+        $increments = ['engaged_seconds' => $seconds - $previousSeconds];
+        if ($previousSeconds === 0 && $previousScroll === 0) {
+            $increments['engaged_views'] = 1;
+        }
+        foreach (self::TIME_THRESHOLDS as $threshold) {
+            if ($previousSeconds < $threshold && $seconds >= $threshold) {
+                $increments['time_'.$threshold] = 1;
+            }
+        }
+        foreach (self::SCROLL_THRESHOLDS as $threshold) {
+            if ($previousScroll < $threshold && $scroll >= $threshold) {
+                $increments['scroll_'.$threshold] = 1;
+            }
+        }
+        $increments = array_filter($increments);
+        if ($increments !== []) {
+            $this->bump('daily_pages', ['site_id' => $site->id, 'date' => $date, 'path_hash' => hash('sha256', $path)], $increments, ['path' => $path]);
+        }
+
+        // The visit lasted at least until the visitor left this page.
+        $visit = $this->openVisit($site, $visitorHash, $now);
+        if ($visit !== null) {
+            DB::table(Tables::name('visits'))
+                ->where(['site_id' => $site->id, 'visitor_hash' => $visitorHash, 'started_at' => $visit->started_at])
+                ->update(['last_seen_at' => $this->utc($now)]);
+        }
     }
 
     /** Closes visits idle longer than visit_timeout_minutes (bounces, duration, exits). Returns the number closed. */

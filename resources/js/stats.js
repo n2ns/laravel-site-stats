@@ -54,10 +54,11 @@
     return tagged ? text(tagged.getAttribute('data-stats-label'), 120) : undefined;
   }
 
-  // path: the page the data belongs to (default the current one).
-  function send(type, extra, path) {
+  // path: the page the data belongs to (default the current one); skip: whether that page has the skip tag
+  // (default: read now).
+  function send(type, extra, path, skip) {
     try {
-      if (blocked || !site || meta('skip') != null) return;
+      if (blocked || !site || (skip === undefined ? meta('skip') != null : skip)) return;
       path = path || loc.pathname;
       for (var i = 0; i < excluded.length; i++) if (excluded[i].test(path)) return;
       var data = { s: site, t: type, u: pageUrl(), w: w.screen ? w.screen.width : undefined };
@@ -75,15 +76,50 @@
 
   // data-pageviews="off": page views are counted on the server; the script only sends events.
   var pageviews = attr('data-pageviews') !== 'off';
+  // Time on page and scroll depth of the current page view, sent when the page is hidden or left. A page view
+  // can report again after being shown again; e0/sp0 tell the collector what was already reported.
+  var current, visibleMs = 0, visibleSince = null, maxScroll = 0;
+  function scrollDepth() {
+    var el = d.documentElement;
+    var h = Math.max(el.scrollHeight, d.body ? d.body.scrollHeight : 0) - w.innerHeight;
+    if (h <= 0) return 100;
+    return Math.min(100, Math.max(0, Math.round(((w.pageYOffset || el.scrollTop || 0) / h) * 100)));
+  }
+  // leaving: an SPA navigation, where the DOM may already show the next page, so only what was measured on
+  // this page (and its skip tag, sampled after it rendered) is used.
+  function report(leaving) {
+    try {
+      if (!current) return;
+      var ms = visibleMs + (visibleSince === null ? 0 : Date.now() - visibleSince);
+      if (ms === 0) return; // never visible
+      var e = Math.min(86400, Math.round(ms / 1000));
+      var sp = maxScroll = Math.max(maxScroll, current.sp, leaving ? 0 : scrollDepth());
+      if (e <= current.e && sp <= current.sp) return;
+      send('engagement', { u: current.u, e: e, sp: sp, e0: current.e || undefined, sp0: current.sp || undefined }, current.p,
+        leaving ? current.skip : undefined);
+      current.e = e;
+      current.sp = sp;
+    } catch (err) { /* ignore */ }
+  }
+
   var lastPath;
   // deferred: after a history change, wait until the router has rendered the new page (title, meta tags).
-  function pageview(deferred) {
-    if (!pageviews) return;
+  function enter(deferred) {
     var path = loc.pathname;
     if (path === lastPath) return;
+    report(deferred);
     lastPath = path;
     var url = pageUrl();
+    var page = current = { u: url, p: path, e: 0, sp: 0, skip: false };
+    visibleMs = 0;
+    visibleSince = d.visibilityState === 'hidden' ? null : Date.now();
+    maxScroll = 0;
     var go = function () {
+      // The page has rendered: sample its depth (a page that fits the screen is 100%) and its skip tag.
+      if (current === page) {
+        try { maxScroll = Math.max(maxScroll, scrollDepth()); page.skip = meta('skip') != null; } catch (err) { /* ignore */ }
+      }
+      if (!pageviews) return;
       var type = meta('type');
       send('pageview', {
         u: url,
@@ -95,7 +131,7 @@
     };
     if (deferred) w.setTimeout(go, 0); else go();
   }
-  function navigated() { pageview(true); }
+  function navigated() { enter(true); }
 
   function track(name, options) {
     options = options || {};
@@ -140,9 +176,21 @@
   w.addEventListener('popstate', navigated);
   d.addEventListener('click', onClick, true);
   d.addEventListener('auxclick', onClick, true);
+  w.addEventListener('scroll', function () {
+    try { var sp = scrollDepth(); if (sp > maxScroll) maxScroll = sp; } catch (err) { /* ignore */ }
+  }, { passive: true });
+  d.addEventListener('visibilitychange', function () {
+    if (d.visibilityState === 'hidden') {
+      if (visibleSince !== null) { visibleMs += Date.now() - visibleSince; visibleSince = null; }
+      report();
+    } else if (visibleSince === null) {
+      visibleSince = Date.now();
+    }
+  });
+  w.addEventListener('pagehide', report);
 
   var queue = (w.n2nStats && w.n2nStats.q) || [];
   w.n2nStats = track;
-  pageview();
+  enter(false);
   for (var i = 0; i < queue.length; i++) track.apply(null, queue[i]);
 })(window, document);

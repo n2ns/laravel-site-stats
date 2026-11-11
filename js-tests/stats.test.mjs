@@ -61,7 +61,12 @@ function load(options = {}) {
 
   options.before?.(window);
   window.eval(source);
-  return { window, sent, storageTouches, payloads: () => sent.map((s) => s.data) };
+  return {
+    window, sent, storageTouches,
+    // Pageviews and events; engagement reports (time on page, scroll depth) separately.
+    payloads: () => sent.map((s) => s.data).filter((p) => p.t !== 'engagement'),
+    engagements: () => sent.map((s) => s.data).filter((p) => p.t === 'engagement'),
+  };
 }
 
 function click(window, selector, button = 0) {
@@ -239,7 +244,8 @@ test('never touches cookies, localStorage or sessionStorage', async () => {
   window.history.pushState({}, '', '/next');
   window.n2nStats('evt');
   await flush(window);
-  assert.equal(sent.length, 4);
+  // pageview, download, pageview, event (plus the first page's engagement report when any time passed)
+  assert.equal(sent.filter((x) => x.data.t !== 'engagement').length, 4);
   assert.deepEqual(storageTouches, []);
 });
 
@@ -424,4 +430,84 @@ test('data-pageviews="off" sends no pageviews but keeps events', async () => {
   window.n2nStats('signup');
   await flush(window);
   assert.deepEqual(payloads().map((p) => p.t), ['outbound', 'event']);
+});
+
+/** Moves a jsdom page: document height, viewport height and scroll position. */
+function layout(window, { height, viewport = 1000, scrolled = 0 }) {
+  Object.defineProperty(window.document.documentElement, 'scrollHeight', { configurable: true, get: () => height });
+  Object.defineProperty(window, 'innerHeight', { configurable: true, get: () => viewport });
+  Object.defineProperty(window, 'pageYOffset', { configurable: true, get: () => scrolled });
+}
+
+function setVisibility(window, state) {
+  Object.defineProperty(window.document, 'visibilityState', { configurable: true, get: () => state });
+  window.document.dispatchEvent(new window.Event('visibilitychange'));
+}
+
+test('reports time on page and the deepest scroll when the page is hidden, and only the increase later', async () => {
+  let now = 1_000_000;
+  const { window, engagements } = load({ before(w) { w.Date.now = () => now; layout(w, { height: 5000 }); } });
+  layout(window, { height: 5000, scrolled: 1000 });
+  window.dispatchEvent(new window.Event('scroll'));
+  layout(window, { height: 5000, scrolled: 0 });
+  now += 42_000;
+  setVisibility(window, 'hidden');
+  assert.deepEqual(engagements(), [{ s: 'SITE1', t: 'engagement', u: 'https://www.example.com/start?utm_source=news', w: 0, e: 42, sp: 25 }]);
+
+  now += 600_000; // hidden time does not count
+  setVisibility(window, 'visible');
+  now += 18_000;
+  layout(window, { height: 5000, scrolled: 4000 });
+  window.dispatchEvent(new window.Event('scroll'));
+  window.dispatchEvent(new window.Event('pagehide'));
+  assert.deepEqual(engagements()[1], { s: 'SITE1', t: 'engagement', u: 'https://www.example.com/start?utm_source=news', w: 0, e: 60, sp: 100, e0: 42, sp0: 25 });
+
+  window.dispatchEvent(new window.Event('pagehide'));
+  assert.equal(engagements().length, 2, 'nothing new, nothing sent');
+});
+
+test('reports the previous page before an SPA navigation, also with data-pageviews="off"', async () => {
+  let now = 1_000_000;
+  const { window, engagements, payloads } = load({ attrs: { 'data-pageviews': 'off' }, before(w) { w.Date.now = () => now; } });
+  layout(window, { height: 3000, scrolled: 2000 });
+  window.dispatchEvent(new window.Event('scroll'));
+  now += 7_000;
+  window.history.pushState({}, '', '/next');
+  await flush(window);
+  assert.deepEqual(engagements().map((e) => [e.u, e.e, e.sp]), [['https://www.example.com/start?utm_source=news', 7, 100]]);
+  assert.equal(payloads().length, 0);
+});
+
+
+test('scroll depth never goes backwards within a page view', async () => {
+  let now = 1_000_000;
+  const { window, engagements } = load({ before(w) { w.Date.now = () => now; } });
+  layout(window, { height: 500, viewport: 1000 }); // short while loading: fits the screen
+  now += 5_000;
+  setVisibility(window, 'hidden');
+  layout(window, { height: 5000, scrolled: 800 }); // content loaded, scrolled 20%
+  setVisibility(window, 'visible');
+  now += 25_000;
+  setVisibility(window, 'hidden');
+  assert.deepEqual(engagements().map((e) => [e.e, e.sp, e.e0, e.sp0]), [[5, 100, undefined, undefined], [30, 100, 5, 100]]);
+});
+
+test('a page that was never visible reports nothing', async () => {
+  const { window, engagements } = load({ before(w) { Object.defineProperty(w.document, 'visibilityState', { configurable: true, get: () => 'hidden' }); } });
+  layout(window, { height: 500, viewport: 1000 });
+  window.dispatchEvent(new window.Event('pagehide'));
+  assert.equal(engagements().length, 0);
+});
+
+test('the report at an SPA navigation uses what was measured on the page being left', async () => {
+  let now = 1_000_000;
+  const { window, engagements } = load({ before(w) { w.Date.now = () => now; layout(w, { height: 5000 }); } });
+  layout(window, { height: 5000, scrolled: 1000 });
+  window.dispatchEvent(new window.Event('scroll')); // 25% on the old page
+  now += 9_000;
+  // The router swaps in a short new page (and its skip tag) before calling pushState.
+  layout(window, { height: 500, viewport: 1000 });
+  window.document.head.insertAdjacentHTML('beforeend', '<meta name="n2n-stats:skip">');
+  window.history.pushState({}, '', '/new');
+  assert.deepEqual(engagements().map((e) => [e.u, e.e, e.sp]), [['https://www.example.com/start?utm_source=news', 9, 25]]);
 });

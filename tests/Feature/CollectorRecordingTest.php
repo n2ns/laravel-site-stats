@@ -293,3 +293,27 @@ it('records ai fetches without visitors', function () {
         ->and(DB::table('stats_uniques')->count())->toBe(0)
         ->and(DB::table('stats_daily_totals')->count())->toBe(0);
 });
+
+it('records time on page and scroll depth once per page view, with each threshold counted when first reached', function () {
+    recHit($this->site, 'pageview', 'https://example.com/guide');
+    $this->travel(40)->seconds();
+    recHit($this->site, 'engagement', 'https://example.com/guide', ['e' => 40, 'sp' => 55]);
+    $this->travel(200)->seconds();
+    recHit($this->site, 'engagement', 'https://example.com/guide', ['e' => 240, 'sp' => 100, 'e0' => 40, 'sp0' => 55]);
+    recHit($this->site, 'engagement', 'https://example.com/guide', ['e' => 5000, 'sp' => 100, 'e0' => 240, 'sp0' => 100]);
+
+    $row = DB::table('stats_daily_pages')->where('path', '/guide')->first();
+    $columns = ['engaged_views', 'engaged_seconds', 'time_10', 'time_30', 'time_60', 'time_180', 'scroll_25', 'scroll_50', 'scroll_75', 'scroll_100'];
+    expect(array_map(fn ($c) => (int) $row->{$c}, $columns))->toBe([1, 1800, 1, 1, 1, 1, 1, 1, 1, 1])
+        ->and((int) $row->pageviews)->toBe(1);
+
+    // The last report kept the visit open, so its duration includes the time on the page.
+    expect(DB::table('stats_visits')->value('last_seen_at'))->toBe('2026-11-11 10:04:00');
+});
+
+it('does not count engagement on excluded paths', function () {
+    $this->site->update(['exclude_paths' => ['/admin*']]);
+    recHit($this->site, 'engagement', 'https://example.com/admin/x', ['e' => 30, 'sp' => 50]);
+
+    expect(DB::table('stats_daily_pages')->count())->toBe(0);
+});

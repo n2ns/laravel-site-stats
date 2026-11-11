@@ -31,6 +31,14 @@ it('parses events, outbound and download', function () {
         ->and(Payload::fromJson(payloadJson(['t' => 'outbound', 'g' => 'https://other.org/x', 'pt' => 'ignored']))?->title)->toBeNull();
 });
 
+it('parses engagement reports', function () {
+    $p = Payload::fromJson(payloadJson(['t' => 'engagement', 'e' => 75, 'sp' => 60]));
+    expect([$p?->seconds, $p?->scroll, $p?->previousSeconds, $p?->previousScroll])->toBe([75, 60, 0, 0]);
+
+    $p = Payload::fromJson(payloadJson(['t' => 'engagement', 'e' => 300, 'sp' => 100, 'e0' => 75, 'sp0' => 60]));
+    expect([$p?->seconds, $p?->scroll, $p?->previousSeconds, $p?->previousScroll])->toBe([300, 100, 75, 60]);
+});
+
 it('parses the same fields from an array', function () {
     expect(Payload::fromArray(['s' => PAYLOAD_SITE, 't' => 'pageview', 'u' => 'https://example.com/', 'py' => 'home'])?->pageType)->toBe('home')
         ->and(Payload::fromArray(['s' => PAYLOAD_SITE, 't' => 'pageview']))->toBeNull();
@@ -64,6 +72,14 @@ it('rejects malformed payloads', function (string $body) {
     'bad page type' => [payloadJson(['py' => 'Product Page'])],
     'long group' => [payloadJson(['pg' => str_repeat('a', 121)])],
     'title not a string' => [payloadJson(['pt' => 5])],
+    'engagement without seconds' => [payloadJson(['t' => 'engagement', 'sp' => 10])],
+    'engagement without scroll' => [payloadJson(['t' => 'engagement', 'e' => 10])],
+    'engagement seconds string' => [payloadJson(['t' => 'engagement', 'e' => '10', 'sp' => 10])],
+    'engagement too long' => [payloadJson(['t' => 'engagement', 'e' => 86401, 'sp' => 10])],
+    'engagement scroll over 100' => [payloadJson(['t' => 'engagement', 'e' => 10, 'sp' => 101])],
+    'engagement negative' => [payloadJson(['t' => 'engagement', 'e' => -1, 'sp' => 10])],
+    'engagement shrinking seconds' => [payloadJson(['t' => 'engagement', 'e' => 10, 'sp' => 50, 'e0' => 20, 'sp0' => 50])],
+    'engagement shrinking scroll' => [payloadJson(['t' => 'engagement', 'e' => 30, 'sp' => 40, 'e0' => 20, 'sp0' => 50])],
     'width string' => [payloadJson(['w' => '1280'])],
     'width too big' => [payloadJson(['w' => 10001])],
     'width negative' => [payloadJson(['w' => -1])],

@@ -17,6 +17,12 @@ return [
     'collector_domain' => env('STATS_COLLECTOR_DOMAIN'),
     'collector_path' => env('STATS_COLLECTOR_PATH', ''),
 
+    /*
+    | The standalone dashboard and site management pages. Turn them off when the host shows the statistics in its
+    | own admin, e.g. with the Filament plugin; the script, collector and read API stay available.
+    */
+    'dashboard_enabled' => (bool) env('STATS_DASHBOARD_ENABLED', true),
+
     // Dashboard route prefix on the host app's web domain, guarded by the viewStats gate.
     'dashboard_path' => env('STATS_DASHBOARD_PATH', 'stats'),
     'dashboard_middleware' => ['web'],

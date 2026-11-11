@@ -5,7 +5,10 @@ namespace N2ns\Stats\Collector;
 /** Browser payload (design §5.1). */
 final readonly class Payload
 {
-    public const TYPES = ['pageview', 'outbound', 'download', 'event'];
+    public const TYPES = ['pageview', 'outbound', 'download', 'event', 'engagement'];
+
+    /** Longest time on page an engagement report may carry (one day). */
+    public const MAX_SECONDS = 86400;
 
     public function __construct(
         public string $site,
@@ -19,6 +22,12 @@ final readonly class Payload
         public ?string $title = null,
         public ?string $pageType = null,
         public ?string $group = null,
+        /** engagement: seconds the page was visible and the deepest scroll (percent), in total so far ... */
+        public int $seconds = 0,
+        public int $scroll = 0,
+        /** ... and the totals already reported for this page view (0 in its first report). */
+        public int $previousSeconds = 0,
+        public int $previousScroll = 0,
     ) {}
 
     /** Parses and validates the raw request body; null when malformed (=> HTTP 400). */
@@ -65,7 +74,13 @@ final readonly class Payload
             return $value;
         };
 
-        if ($type === 'pageview') {
+        $engagement = [0, 0, 0, 0];
+        if ($type === 'engagement') {
+            $engagement = self::engagement($data);
+            if ($engagement === null) {
+                return null;
+            }
+        } elseif ($type === 'pageview') {
             if (isset($data['r']) && $data['r'] !== '') {
                 if (! is_string($data['r']) || strlen($data['r']) > 2048) {
                     return null;
@@ -116,8 +131,29 @@ final readonly class Payload
 
         return new self(
             strtoupper($site), $type, $url, $fields['referrer'], $fields['name'], $fields['label'], $width,
-            $fields['target'], $fields['title'], $fields['pageType'], $fields['group'],
+            $fields['target'], $fields['title'], $fields['pageType'], $fields['group'], ...$engagement,
         );
+    }
+
+    /**
+     * e and sp: total seconds and deepest scroll so far; e0 and sp0: what was already reported (default 0).
+     *
+     * @param  array<mixed>  $data
+     * @return array{0: int, 1: int, 2: int, 3: int}|null
+     */
+    private static function engagement(array $data): ?array
+    {
+        $values = [];
+        foreach (['e' => self::MAX_SECONDS, 'sp' => 100, 'e0' => self::MAX_SECONDS, 'sp0' => 100] as $key => $max) {
+            $value = $data[$key] ?? (str_ends_with($key, '0') ? 0 : null);
+            if (! is_int($value) || $value < 0 || $value > $max) {
+                return null;
+            }
+            $values[] = $value;
+        }
+        [$seconds, $scroll, $previousSeconds, $previousScroll] = $values;
+
+        return $previousSeconds <= $seconds && $previousScroll <= $scroll ? $values : null;
     }
 
     private static function isHttpUrl(string $url): bool

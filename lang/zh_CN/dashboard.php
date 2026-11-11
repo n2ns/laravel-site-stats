@@ -33,9 +33,12 @@ return [
         'day' => 'M月D日',
         'day_year' => 'YYYY年M月D日',
         'day_only' => 'D日',
+        'weekday' => 'M月D日 ddd',
     ],
 
     'summary' => '概览',
+    'more_metrics' => '更多指标',
+    'vs_previous' => '较之前的日子',
     'kpis' => [
         'visitors' => '访客',
         'visits' => '访问次数',
@@ -44,6 +47,7 @@ return [
         'views_per_visit' => '每次访问浏览页数',
         'bounce_rate' => '跳出率',
         'avg_duration_seconds' => '平均访问时长',
+        'avg_page_seconds' => '平均页面停留',
         'events' => '事件',
         'outbound' => '外链点击',
         'realtime' => '实时',
@@ -57,6 +61,8 @@ return [
         'aria' => '每日:metrics折线图；下方数据表列出了具体数值。',
         'table' => '数据表',
         'date' => '日期',
+        'metric' => '图表指标',
+        'explore' => '“:title”：用左右方向键逐日查看数值。',
     ],
     'metrics' => [
         'visitors' => '访客',
@@ -92,4 +98,8 @@ return [
     'sort' => '按“:column”排序',
     'donut' => '按:metric统计的“:title”各项占比；图例列出了具体数值。',
     'other' => '其他',
+    'show_all' => '显示全部 :count 行',
+    'show_top' => '只显示前 :count 行',
+    'details' => '全部列',
+    'details_table' => '“:title”的全部列',
 ];

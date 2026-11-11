@@ -4,10 +4,8 @@ namespace N2ns\Stats\Console;
 
 use DateTimeZone;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use N2ns\Stats\Models\Site;
-use N2ns\Stats\Support\Tables;
 
 class SiteCommand extends Command
 {
@@ -25,13 +23,6 @@ class SiteCommand extends Command
         {--force : Delete without asking}';
 
     protected $description = 'Manage the sites tracked by N2N Stats';
-
-    /** Tables that hold per-site rows, deleted together with the site. */
-    public const MAX_LOCALES = 20;
-
-    public const MAX_EXCLUDE_PATHS = 50;
-
-    private const SITE_TABLES = ['uniques', 'visits', 'daily_totals', 'daily_pages', 'daily_sources', 'daily_dimensions', 'daily_events', 'daily_entries', 'daily_transitions'];
 
     public function handle(): int
     {
@@ -126,12 +117,7 @@ class SiteCommand extends Command
             return self::FAILURE;
         }
 
-        DB::transaction(function () use ($site): void {
-            foreach (self::SITE_TABLES as $table) {
-                DB::table(Tables::name($table))->where('site_id', $site->id)->delete();
-            }
-            $site->delete();
-        });
+        $site->deleteWithStatistics();
 
         $this->components->info("Site {$site->public_id} and its statistics deleted.");
 
@@ -141,8 +127,7 @@ class SiteCommand extends Command
     private function key(): int
     {
         $site = $this->findSite();
-        $key = Str::random(40);
-        $site->update(['server_key_hash' => hash('sha256', $key)]);
+        $key = $site->rotateServerKey();
 
         $this->components->info("New server key for {$site->public_id}. It is shown only once; any previous key stops working.");
         $this->line('Put these lines in the .env of the client app:');
@@ -165,7 +150,7 @@ class SiteCommand extends Command
      * Base URL of the collector routes, e.g. https://stats.example.com. The CLI has no request, so a collector domain
      * is always given as https; without one the collector shares the host app's domain and the URL comes from APP_URL.
      */
-    private static function collectorBaseUrl(): string
+    public static function collectorBaseUrl(): string
     {
         $url = Str::beforeLast(route('stats.script'), '/js/stats.js');
 
@@ -208,23 +193,13 @@ class SiteCommand extends Command
         $valid = [];
         foreach ($domains as $domain) {
             $domain = strtolower(trim($domain));
-            if (! self::isValidDomain($domain)) {
+            if (! Site::isValidDomain($domain)) {
                 $this->fail("Invalid domain \"{$domain}\". Use a hostname such as example.com or *.example.com.");
             }
             $valid[] = $domain;
         }
 
         return array_values(array_unique($valid));
-    }
-
-    public static function isValidDomain(string $domain): bool
-    {
-        $host = str_starts_with($domain, '*.') ? substr($domain, 2) : $domain;
-        if (strlen($host) > 253 || filter_var($host, FILTER_VALIDATE_IP) !== false) {
-            return false;
-        }
-
-        return preg_match('/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/', $host) === 1;
     }
 
     /**
@@ -238,8 +213,8 @@ class SiteCommand extends Command
 
         $locales = $this->listOption('locale');
         if ($locales !== []) {
-            if (count($locales) > self::MAX_LOCALES) {
-                $this->fail('At most '.self::MAX_LOCALES.' --locale values are allowed.');
+            if (count($locales) > Site::MAX_LOCALES) {
+                $this->fail('At most '.Site::MAX_LOCALES.' --locale values are allowed.');
             }
             $options['locales'] = array_values(array_unique(array_map(fn (string $l): string => $this->validLocale($l, '--locale'), $locales)));
         }
@@ -251,12 +226,12 @@ class SiteCommand extends Command
 
         $paths = $this->listOption('exclude-path');
         if ($paths !== []) {
-            if (count($paths) > self::MAX_EXCLUDE_PATHS) {
-                $this->fail('At most '.self::MAX_EXCLUDE_PATHS.' --exclude-path values are allowed.');
+            if (count($paths) > Site::MAX_EXCLUDE_PATHS) {
+                $this->fail('At most '.Site::MAX_EXCLUDE_PATHS.' --exclude-path values are allowed.');
             }
             foreach ($paths as $path) {
-                if (! str_starts_with($path, '/') || mb_strlen($path) > 200 || preg_match('/[\x00-\x1F\x7F]/', $path) === 1) {
-                    $this->fail("Invalid --exclude-path \"{$path}\". It must start with / and have at most 200 characters.");
+                if (! Site::isValidExcludePath($path)) {
+                    $this->fail("Invalid --exclude-path \"{$path}\". It must start with / and have at most ".Site::MAX_PATH_LENGTH.' characters.');
                 }
             }
             $options['exclude_paths'] = array_values(array_unique($paths));
@@ -283,7 +258,7 @@ class SiteCommand extends Command
     private function validLocale(string $locale, string $option): string
     {
         $locale = strtolower(trim($locale));
-        if (preg_match('/^[a-z]{2,3}(-[a-z0-9]{2,8})?$/', $locale) !== 1) {
+        if (! Site::isValidLocale($locale)) {
             $this->fail("Invalid {$option} \"{$locale}\". Use a language code such as en, pt-br or zh-cn.");
         }
 

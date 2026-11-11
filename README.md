@@ -145,7 +145,7 @@ of its statistics. Sites can also be added and edited on the dashboard.
 
 ## The tracking script
 
-The script is a single dependency-free file of about 6 KB.
+The script is a single dependency-free file of about 8 KB.
 
 **Automatic:**
 
@@ -155,6 +155,9 @@ The script is a single dependency-free file of about 6 KB.
 - An `outbound` event when a link to another host is clicked (left or middle button).
 - A `download` event when a link to a file with one of the configured `download_extensions`
   (pdf, zip, dmg, exe, apk, …) is clicked.
+- Time on page and scroll depth: when the page is hidden or left (closing the tab, switching tabs, a
+  single-page-app navigation), the script reports how long the page was visible and how far it was
+  scrolled. A page that is shown again reports only what was added.
 - Outbound and download events carry the link and, when the link or one of its parents has a
   `data-stats-label` attribute, that label, e.g. the project a card belongs to:
   `<div data-stats-label="pairdock"><a href="https://github.com/…">…</a></div>`.
@@ -271,33 +274,43 @@ failures are logged and never affect the page.
 
 ## Dashboard
 
-Open `/stats` (the `dashboard_path`) on your app's domain. It is plain server-rendered Blade with
-inline SVG charts: no front-end build and no CDN. The interface is in English and Simplified Chinese
-and follows your app's locale (`zh_CN` shows Chinese).
+Open `/stats` (the `dashboard_path`) on your app's domain (unless `dashboard_enabled` is off, e.g. for
+apps that use the [Filament](#filament) pages instead). It is plain server-rendered Blade with
+inline SVG charts and a little plain JavaScript: no front-end build, no CDN, no external fonts. The
+interface is in English and Simplified Chinese and follows your app's locale (`zh_CN` shows Chinese).
+It has a light and a dark theme that follow the system setting, works down to phone width, and
+respects reduced motion.
 
 - Site switcher and date ranges (today, yesterday, 7, 15, 30 and 90 days, this month, last month,
   custom). Changes are computed over complete days: a range that includes today compares its days up
   to yesterday with the same number of days before (today alone compares yesterday with the day
   before); the page shows both compared ranges.
-- Overview: visitors, visits, page views, pages viewed, views per visit, bounce rate, average visit
-  duration, events, outbound clicks, visitors online now (visits with activity in the last 5 minutes)
-  and a daily chart of visitors, visits, page views, events and outbound clicks.
+- Overview: visitors, visits, page views, bounce rate and average visit duration as the main
+  figures; pages viewed, views per visit, average time on page, events, outbound clicks and visitors
+  online now (visits with activity in the last 5 minutes) below them. Each figure shows its change
+  (a lower bounce rate counts as better) and a small trend line of its daily values. A
+  daily chart shows one of visitors, visits, page views, events and outbound clicks at a time, with
+  each day's values on hover or with the arrow keys, and its data table.
 - **Pages:** pages with title and type, entry pages with the page views, outbound clicks and events
-  of the visits that started there, exit pages, page types, content groups, and moves from page to page.
+  of the visits that started there, exit pages, time on page and scroll depth (average time and the
+  share of page views that stayed at least 10 s, 30 s, 1 min, 3 min and scrolled 25%, 50%, 75%, to the
+  end), page types, content groups, and moves from page to page.
 - **Sources:** source types and sources (with page views, outbound clicks and events), UTM campaigns,
   and landing pages by source, by campaign and by search engine.
 - **Visitors:** countries, devices, browsers, operating systems, browser languages and site languages,
   with visits, visitors and page views.
-- **Events:** custom events with label and target, outbound links and downloads with label, and every
-  event with the page it happened on.
+- **Events:** custom events with label and target, outbound links and downloads with label, every
+  event with the page it happened on, and events per site language version (for sites with
+  site languages).
 - **AI:** visits and visitors referred by AI assistants and AI fetches with a daily chart, AI referrals,
   the pages AI assistants send visitors to, AI fetchers (crawler or user-triggered, with the number of
   pages fetched) and the pages they fetched.
-- Every table shows the top 50 rows with each row's share, can be sorted by any column and exported
-  as CSV (up to 500 rows); source types, countries, devices, site languages and page types also have
-  a donut chart.
+- Each report is a card with its main column, main figure and each row's share: the top 10 rows,
+  with "show all" for the top 50. Reports with more columns have an "All columns" view with the full
+  table. Tables can be sorted by any column and exported as CSV (up to 500 rows); source types,
+  countries, devices, site languages and page types also have a donut chart.
 - Site management: add sites, edit domains, timezone, site languages, excluded paths and public
-  counts, show the embed snippet, reset the server key.
+  counts, show and copy the embed snippet, reset the server key (shown once).
 
 ## Filament
 
@@ -309,9 +322,24 @@ use N2ns\Stats\Filament\StatsPlugin;
 $panel->plugin(StatsPlugin::make()->navigationGroup('Analytics')->navigationLabel('Statistics'));
 ```
 
-It adds a page with the full dashboard inside your panel, and widgets with each site's visitors and
-page views for today and the last 7 days (with the change over complete days) and the top 5 sources
-of the last 7 days. Both are visible to users allowed by the `viewStats` gate.
+It adds, built from native Filament components so they follow your panel's colours and dark mode:
+
+- a statistics page: site and range filters kept in the URL, the key figures with their change over
+  complete days and daily sparklines, the daily traffic chart, and the reports in tabs (pages,
+  sources, visitors, events, AI) as sortable, searchable, paginated tables with CSV export and
+  doughnut charts;
+- a Sites resource to create, edit and delete sites (deleting removes their statistics too), copy
+  the embed code and generate a server key for client mode; leave it out with
+  `->sitesResource(false)`;
+- widgets for your panel's dashboard with each site's visitors and page views for today and the last
+  7 days (with the change over complete days) and the top 5 sources of the last 7 days.
+
+All of it is visible only to users allowed by the `viewStats` gate. Report tabs load when they are
+opened. The Filament pages do not use the standalone dashboard, so turn that off to keep a single entry:
+
+```dotenv
+STATS_DASHBOARD_ENABLED=false
+```
 
 ## Read API
 
@@ -329,14 +357,14 @@ The token is shown only once; only its SHA-256 hash is stored. Send it as a bear
 | --- | --- |
 | `GET /api/v1/sites` | The sites the token can read |
 | `GET /api/v1/sites/{public_id}/summary` | Totals for the range, and `comparison`: the complete-day current and previous ranges with their totals |
-| `GET /api/v1/sites/{public_id}/timeseries` | Daily visitors, visits, page views, events and outbound clicks |
+| `GET /api/v1/sites/{public_id}/timeseries` | Daily visitors, visits, page views, events, outbound clicks, pages viewed, views per visit, bounce rate, average visit duration and average time on page |
 | `GET /api/v1/sites/{public_id}/ai` | AI visits, visitors, page views and fetches, with a daily series |
 | `GET /api/v1/sites/{public_id}/breakdown/{report}?limit=&offset=&min_visitors=` | Rows of one report |
 | `GET /api/v1/sites/{public_id}/snapshot?limit=&min_visitors=` | Summary, timeseries, AI and the top rows of every report in one call |
 
-`report` is one of `pages`, `entries`, `exits`, `page_types`, `content`, `transitions`, `source_types`,
+`report` is one of `pages`, `entries`, `exits`, `engagement`, `page_types`, `content`, `transitions`, `source_types`,
 `sources`, `campaigns`, `landing_pages`, `campaign_pages`, `search_pages`, `countries`, `devices`,
-`browsers`, `os`, `languages`, `locales`, `outbound`, `downloads`, `events`, `event_pages`, `ai_referrals`,
+`browsers`, `os`, `languages`, `locales`, `outbound`, `downloads`, `events`, `event_pages`, `event_locales`, `ai_referrals`,
 `ai_pages`, `ai_fetchers`, `ai_fetched_pages`. Breakdown rows are paged with `limit` (1–500, default 50)
 and `offset`; `has_more` says whether more rows follow. `min_visitors` leaves out rows with fewer
 visitors. The snapshot's `limit` is 1–100 (default 10).
@@ -383,6 +411,7 @@ Publish the file with `php artisan vendor:publish --tag=stats-config`. Main opti
 | `table_prefix` | `STATS_TABLE_PREFIX` | `stats_` | Prefix of all tables |
 | `collector_domain` | `STATS_COLLECTOR_DOMAIN` | none | Domain for the script, collector and API; none = the current domain |
 | `collector_path` | `STATS_COLLECTOR_PATH` | empty | Path prefix of those routes |
+| `dashboard_enabled` | `STATS_DASHBOARD_ENABLED` | `true` | Serve the standalone dashboard and site management pages; turn off when the host shows the statistics in its own admin (Filament plugin) |
 | `dashboard_path` | `STATS_DASHBOARD_PATH` | `stats` | Dashboard route prefix |
 | `dashboard_middleware` | | `['web']` | Middleware of the dashboard routes (the `viewStats` gate is always applied) |
 | `host_site` | `STATS_HOST_SITE` | none | Host mode: public id of the site the middleware and `Stats::event()` count for; none = found by the `Host` header |
@@ -407,7 +436,7 @@ All tables use the `table_prefix`. Daily tables are bucketed by the site's timez
 | `stats_sites` | Name, public id, allowed domains, timezone, site languages, excluded paths, public counts, hash of the server key | Until deleted |
 | `stats_api_tokens` | Name, hash of the token, allowed sites, last use | Until revoked |
 | `stats_daily_totals` | Page views, visitors, visits, bounces, visit duration, events, outbound clicks per day | `retention_days` |
-| `stats_daily_pages` | Per path: page views, visitors, entries, exits, the page views, outbound clicks and events of visits that entered there; title, page type, content group | `retention_days` |
+| `stats_daily_pages` | Per path: page views, visitors, entries, exits, the page views, outbound clicks and events of visits that entered there; time on page and scroll depth; title, page type, content group | `retention_days` |
 | `stats_daily_sources` | Per source (type, host or UTM source, medium, campaign, content, term): visits, visitors, page views, bounces, outbound clicks, events | `retention_days` |
 | `stats_daily_entries` | Per entry page and source: visits, visitors | `retention_days` |
 | `stats_daily_transitions` | Per move from one page to another: count, visitors | `retention_days` |
@@ -435,6 +464,14 @@ All tables use the `table_prefix`. Daily tables are bucketed by the site's timez
 - **Events:** outbound clicks, downloads and custom events (AI fetches are counted separately). An
   event is credited to the source and the entry page of the visit it happens in.
 - **Page move:** two consecutive page views of one visit on different paths.
+- **Time on page:** how long a page was visible (time in a hidden tab does not count), reported by the
+  script when the page is hidden or left; at most 30 minutes per page view. Pages viewed without the
+  script reporting it (closed before the report could be sent, or counted only on the server without
+  the script) are not part of these figures; "measured views" says how many page views they cover.
+- **Scroll depth:** the deepest point of the page that was in view, as a percentage of the page
+  height; a page that fits on the screen counts as 100%. A page that was never visible (opened in a
+  background tab and closed unseen) reports nothing.
+- **Visit duration** includes the time on the last page when the script reported it.
 - **Visit duration:** the time between the first and the last activity of a visit; the total of
   ended visits is stored, and the average is derived from it. A single page view without further
   events lasts 0 seconds.

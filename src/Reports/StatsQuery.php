@@ -21,6 +21,10 @@ class StatsQuery
         'pages' => ['path', 'title', 'page_type', 'pageviews', 'visitors', 'entries', 'exits'],
         'entries' => ['path', 'title', 'entries', 'visitors', 'entry_pageviews', 'entry_outbound', 'entry_events'],
         'exits' => ['path', 'title', 'exits'],
+        'engagement' => [
+            'path', 'title', 'engaged_views', 'avg_seconds', 'time_10', 'time_30', 'time_60', 'time_180',
+            'scroll_25', 'scroll_50', 'scroll_75', 'scroll_100',
+        ],
         'page_types' => ['page_type', 'pageviews', 'visitors', 'pages'],
         'content' => ['content_group', 'title', 'pageviews', 'visitors', 'pages'],
         'transitions' => ['from_path', 'to_path', 'count', 'visitors'],
@@ -40,6 +44,7 @@ class StatsQuery
         'downloads' => ['target', 'label', 'count', 'visitors'],
         'events' => ['name', 'label', 'target', 'count', 'visitors'],
         'event_pages' => ['kind', 'name', 'label', 'target', 'path', 'count', 'visitors'],
+        'event_locales' => ['locale', 'kind', 'name', 'count', 'visitors'],
         'ai_referrals' => ['source', 'visits', 'visitors', 'pageviews'],
         'ai_pages' => ['source', 'path', 'visits', 'visitors'],
         'ai_fetchers' => ['name', 'fetch_type', 'count', 'pages'],
@@ -47,9 +52,9 @@ class StatsQuery
     ];
 
     public const REPORTS = [
-        'pages', 'entries', 'exits', 'page_types', 'content', 'transitions', 'source_types', 'sources', 'campaigns',
+        'pages', 'entries', 'exits', 'engagement', 'page_types', 'content', 'transitions', 'source_types', 'sources', 'campaigns',
         'landing_pages', 'campaign_pages', 'search_pages', 'countries', 'devices', 'browsers', 'os', 'languages',
-        'locales', 'outbound', 'downloads', 'events', 'event_pages', 'ai_referrals', 'ai_pages', 'ai_fetchers',
+        'locales', 'outbound', 'downloads', 'events', 'event_pages', 'event_locales', 'ai_referrals', 'ai_pages', 'ai_fetchers',
         'ai_fetched_pages',
     ];
 
@@ -83,24 +88,45 @@ class StatsQuery
         ];
     }
 
-    /** @return list<array{date: string, visitors: int, visits: int, pageviews: int, events: int, outbound: int}> one row per day, zero-filled */
+    /**
+     * One zero-filled row per day: the counts, and the day's pages viewed, views per visit, bounce rate, average visit
+     * duration and average time on page.
+     *
+     * @return list<array{date: string, visitors: int, visits: int, pageviews: int, events: int, outbound: int, pages: int, views_per_visit: float, bounce_rate: float, avg_duration_seconds: int, avg_page_seconds: int}>
+     */
     public function timeseries(Site $site, CarbonImmutable $from, CarbonImmutable $to): array
     {
         $byDate = [];
-        foreach ($this->range('daily_totals', $site, $from, $to)->get(['date', 'visitors', 'visits', 'pageviews', 'events', 'outbound']) as $row) {
+        foreach ($this->range('daily_totals', $site, $from, $to)->get(['date', 'visitors', 'visits', 'pageviews', 'events', 'outbound', 'bounces', 'duration_seconds']) as $row) {
             $byDate[substr((string) $row->date, 0, 10)] = $row;
+        }
+        $pagesByDate = [];
+        $pageRows = $this->range('daily_pages', $site, $from, $to)->select('date')
+            ->selectRaw('SUM(CASE WHEN pageviews > 0 THEN 1 ELSE 0 END) AS pages, SUM(engaged_views) AS engaged_views, SUM(engaged_seconds) AS engaged_seconds')
+            ->groupBy('date')->get();
+        foreach ($pageRows as $row) {
+            $pagesByDate[substr((string) $row->date, 0, 10)] = $row;
         }
 
         $series = [];
         foreach ($this->days($from, $to) as $date) {
             $row = $byDate[$date] ?? null;
+            $pages = $pagesByDate[$date] ?? null;
+            $visits = (int) ($row->visits ?? 0);
+            $pageviews = (int) ($row->pageviews ?? 0);
+            $engagedViews = (int) ($pages->engaged_views ?? 0);
             $series[] = [
                 'date' => $date,
                 'visitors' => (int) ($row->visitors ?? 0),
-                'visits' => (int) ($row->visits ?? 0),
-                'pageviews' => (int) ($row->pageviews ?? 0),
+                'visits' => $visits,
+                'pageviews' => $pageviews,
                 'events' => (int) ($row->events ?? 0),
                 'outbound' => (int) ($row->outbound ?? 0),
+                'pages' => (int) ($pages->pages ?? 0),
+                'views_per_visit' => $visits > 0 ? round($pageviews / $visits, 2) : 0.0,
+                'bounce_rate' => $visits > 0 ? round((int) ($row->bounces ?? 0) / $visits, 4) : 0.0,
+                'avg_duration_seconds' => intdiv((int) ($row->duration_seconds ?? 0), max($visits, 1)),
+                'avg_page_seconds' => $engagedViews > 0 ? intdiv((int) ($pages->engaged_seconds ?? 0), $engagedViews) : 0,
             ];
         }
 
@@ -155,6 +181,12 @@ class StatsQuery
             throw new InvalidArgumentException("Unknown report [{$report}].");
         }
 
+        if ($report === 'event_locales') {
+            $rows = array_filter($this->eventLocales($site, $from, $to), fn (array $row): bool => $row['visitors'] >= $minVisitors);
+
+            return array_slice(array_values($rows), max(0, $offset), max(1, $limit));
+        }
+
         $query = $this->query($site, $report, $from, $to);
         if ($minVisitors > 0 && in_array('visitors', self::COLUMNS[$report], true)) {
             $query->havingRaw('SUM(visitors) >= ?', [$minVisitors]);
@@ -174,6 +206,10 @@ class StatsQuery
             throw new InvalidArgumentException("Unknown report [{$report}].");
         }
 
+        if ($report === 'event_locales') {
+            return array_sum(array_column($this->eventLocales($site, $from, $to), 'count'));
+        }
+
         return (int) DB::query()->fromSub($this->query($site, $report, $from, $to), 'r')->sum(self::mainMetric($report));
     }
 
@@ -181,7 +217,7 @@ class StatsQuery
     public static function mainMetric(string $report): string
     {
         foreach (self::COLUMNS[$report] as $column) {
-            if (in_array($column, ['pageviews', 'entries', 'exits', 'visits', 'count'], true)) {
+            if (in_array($column, ['pageviews', 'entries', 'exits', 'engaged_views', 'visits', 'count'], true)) {
                 return $column;
             }
         }
@@ -255,10 +291,16 @@ class StatsQuery
         return match ($report) {
             'pages' => $this->range('daily_pages', $site, $from, $to)->select('path')
                 ->selectRaw('MAX(title) AS title, MAX(page_type) AS page_type, SUM(pageviews) AS pageviews, SUM(visitors) AS visitors, SUM(entries) AS entries, SUM(exits) AS exits')
-                ->groupBy('path')->orderByRaw('SUM(pageviews) DESC')->orderBy('path'),
+                ->groupBy('path')->havingRaw('SUM(pageviews) > 0')->orderByRaw('SUM(pageviews) DESC')->orderBy('path'),
             'entries' => $this->range('daily_pages', $site, $from, $to)->where('entries', '>', 0)->select('path')
                 ->selectRaw('MAX(title) AS title, SUM(entries) AS entries, SUM(visitors) AS visitors, SUM(entry_pageviews) AS entry_pageviews, SUM(entry_outbound) AS entry_outbound, SUM(entry_events) AS entry_events')
                 ->groupBy('path')->orderByRaw('SUM(entries) DESC')->orderBy('path'),
+            // Summed per path first: a page view reported after midnight leaves seconds on a day without a measured view.
+            'engagement' => $this->range('daily_pages', $site, $from, $to)->select('path')
+                ->selectRaw('MAX(title) AS title, SUM(engaged_views) AS engaged_views, SUM(engaged_seconds) AS engaged_seconds, '
+                    .'SUM(time_10) AS time_10, SUM(time_30) AS time_30, SUM(time_60) AS time_60, SUM(time_180) AS time_180, '
+                    .'SUM(scroll_25) AS scroll_25, SUM(scroll_50) AS scroll_50, SUM(scroll_75) AS scroll_75, SUM(scroll_100) AS scroll_100')
+                ->groupBy('path')->havingRaw('SUM(engaged_views) > 0')->orderByRaw('SUM(engaged_views) DESC')->orderBy('path'),
             'exits' => $this->range('daily_pages', $site, $from, $to)->where('exits', '>', 0)->select('path')
                 ->selectRaw('MAX(title) AS title, SUM(exits) AS exits')
                 ->groupBy('path')->orderByRaw('SUM(exits) DESC')->orderBy('path'),
@@ -310,17 +352,48 @@ class StatsQuery
     private function row(string $report, array $row): array
     {
         $out = [];
+        $views = (int) ($row['engaged_views'] ?? 0);
         foreach (self::COLUMNS[$report] as $column) {
             $out[$column] = match ($column) {
+                'avg_seconds' => $views > 0 ? intdiv((int) $row['engaged_seconds'], $views) : 0,
+                'time_10', 'time_30', 'time_60', 'time_180', 'scroll_25', 'scroll_50', 'scroll_75', 'scroll_100' => $views > 0 ? round((int) $row[$column] / $views, 4) : 0.0,
                 'bounce_rate' => (int) $row['visits'] > 0 ? round((int) $row['bounces'] / (int) $row['visits'], 4) : 0.0,
                 'fetch_type' => in_array((string) $row['name'], (array) config('stats.ai_user_fetchers', []), true) ? 'user' : 'crawler',
                 'path', 'title', 'page_type', 'content_group', 'from_path', 'to_path', 'source_type', 'source', 'utm_medium',
-                'utm_campaign', 'utm_content', 'utm_term', 'value', 'target', 'label', 'name', 'kind' => isset($row[$column]) ? (string) $row[$column] : null,
+                'utm_campaign', 'utm_content', 'utm_term', 'value', 'target', 'label', 'name', 'kind', 'locale' => isset($row[$column]) ? (string) $row[$column] : null,
                 default => (int) $row[$column],
             };
         }
 
         return $out;
+    }
+
+    /**
+     * Outbound clicks, downloads and custom events per site language version of the page they happened on (from the
+     * page path and the site's locales). Empty for sites without locales. "visitors" is the sum over the pages.
+     *
+     * @return list<array{locale: string, kind: string, name: string, count: int, visitors: int}>
+     */
+    private function eventLocales(Site $site, CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        $rows = [];
+        $events = $this->range('daily_events', $site, $from, $to)->whereIn('kind', ['custom', 'outbound', 'download'])
+            ->select('kind', 'name', 'path')->selectRaw('SUM(count) AS count, SUM(visitors) AS visitors')
+            ->groupBy('kind', 'name', 'path')->get();
+        foreach ($events as $event) {
+            $locale = $site->localeOf((string) $event->path);
+            if ($locale === null) {
+                continue;
+            }
+            $key = $locale."\0".$event->kind."\0".$event->name;
+            $rows[$key] ??= ['locale' => $locale, 'kind' => (string) $event->kind, 'name' => (string) $event->name, 'count' => 0, 'visitors' => 0];
+            $rows[$key]['count'] += (int) $event->count;
+            $rows[$key]['visitors'] += (int) $event->visitors;
+        }
+        $rows = array_values($rows);
+        usort($rows, fn (array $a, array $b): int => [$b['count'], $a['locale'], $a['kind'], $a['name']] <=> [$a['count'], $b['locale'], $b['kind'], $b['name']]);
+
+        return $rows;
     }
 
     /** @return array<string, int|float> */
@@ -330,6 +403,8 @@ class StatsQuery
             ->selectRaw('SUM(visitors) AS visitors, SUM(visits) AS visits, SUM(pageviews) AS pageviews, SUM(bounces) AS bounces, SUM(duration_seconds) AS duration_seconds, SUM(events) AS events, SUM(outbound) AS outbound')
             ->first();
         $pages = $this->range('daily_pages', $site, $from, $to)->where('pageviews', '>', 0)->distinct()->count('path_hash');
+        $engaged = $this->range('daily_pages', $site, $from, $to)->selectRaw('SUM(engaged_views) AS v, SUM(engaged_seconds) AS s')->first();
+        $engagedViews = (int) ($engaged->v ?? 0);
 
         $visits = (int) ($row->visits ?? 0);
         $pageviews = (int) ($row->pageviews ?? 0);
@@ -342,6 +417,7 @@ class StatsQuery
             'views_per_visit' => $visits > 0 ? round($pageviews / $visits, 2) : 0.0,
             'bounce_rate' => $visits > 0 ? round((int) ($row->bounces ?? 0) / $visits, 4) : 0.0,
             'avg_duration_seconds' => intdiv((int) ($row->duration_seconds ?? 0), max($visits, 1)),
+            'avg_page_seconds' => $engagedViews > 0 ? intdiv((int) ($engaged->s ?? 0), $engagedViews) : 0,
             'events' => (int) ($row->events ?? 0),
             'outbound' => (int) ($row->outbound ?? 0),
         ];

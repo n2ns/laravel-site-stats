@@ -61,7 +61,7 @@ it('returns the summary with the complete-day comparison', function () {
     S::totals($this->site, '2026-03-01', ['visitors' => 2, 'visits' => 2, 'pageviews' => 2]);
     S::page($this->site, '2026-03-02', '/a', ['pageviews' => 10]);
 
-    $current = ['visitors' => 4, 'visits' => 5, 'pageviews' => 10, 'pages' => 1, 'views_per_visit' => 2.0, 'bounce_rate' => 0.2, 'avg_duration_seconds' => 20, 'events' => 0, 'outbound' => 3];
+    $current = ['visitors' => 4, 'visits' => 5, 'pageviews' => 10, 'pages' => 1, 'views_per_visit' => 2.0, 'bounce_rate' => 0.2, 'avg_duration_seconds' => 20, 'avg_page_seconds' => 0, 'events' => 0, 'outbound' => 3];
     $this->getJson('/api/v1/sites/'.$this->site->public_id.'/summary?from=2026-03-02&to=2026-03-02', $this->auth)
         ->assertOk()
         ->assertExactJson([
@@ -71,7 +71,7 @@ it('returns the summary with the complete-day comparison', function () {
                 'comparison' => [
                     'current_from' => '2026-03-02', 'current_to' => '2026-03-02', 'previous_from' => '2026-03-01', 'previous_to' => '2026-03-01',
                     'current' => $current,
-                    'previous' => ['visitors' => 2, 'visits' => 2, 'pageviews' => 2, 'pages' => 0, 'views_per_visit' => 1.0, 'bounce_rate' => 0.0, 'avg_duration_seconds' => 0, 'events' => 0, 'outbound' => 0],
+                    'previous' => ['visitors' => 2, 'visits' => 2, 'pageviews' => 2, 'pages' => 0, 'views_per_visit' => 1.0, 'bounce_rate' => 0.0, 'avg_duration_seconds' => 0, 'avg_page_seconds' => 0, 'events' => 0, 'outbound' => 0],
                 ],
             ],
         ]);
@@ -107,7 +107,7 @@ it('defaults to the last 30 days in the site timezone', function () {
         ->assertJsonPath('from', '2026-03-02')
         ->assertJsonPath('to', '2026-03-31')
         ->assertJsonCount(30, 'data')
-        ->assertJsonPath('data.0', ['date' => '2026-03-02', 'visitors' => 0, 'visits' => 0, 'pageviews' => 0, 'events' => 0, 'outbound' => 0]);
+        ->assertJsonPath('data.0', ['date' => '2026-03-02', 'visitors' => 0, 'visits' => 0, 'pageviews' => 0, 'events' => 0, 'outbound' => 0, 'pages' => 0, 'views_per_visit' => 0, 'bounce_rate' => 0, 'avg_duration_seconds' => 0, 'avg_page_seconds' => 0]);
 });
 
 it('returns a breakdown with a limit', function () {

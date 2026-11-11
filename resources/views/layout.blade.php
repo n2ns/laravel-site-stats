@@ -6,22 +6,31 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="light dark">
 <title>@yield('title') · {{ __('stats::dashboard.brand') }}</title>
-<style>
-body{margin:0;background:#f6f7f9}
-@media (prefers-color-scheme:dark){body{background:#0f1216}}
-.wrap{max-width:1200px;margin:0 auto;padding:16px}
-header.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px}
-header.top .brand{font-weight:700;font-size:16px;text-decoration:none;color:var(--text)}
-nav.main a{margin-left:12px}
-</style>
 @include('stats::partials.styles')
+<style>
+html,body{margin:0}
+body.stats-dash{background:var(--bg);min-height:100vh}
+.stats-dash .appbar{background:var(--surface);border-bottom:1px solid var(--border)}
+.stats-dash .appbar-inner,.stats-dash .wrap{max-width:1200px;margin:0 auto;padding:0 var(--space-4)}
+.stats-dash .appbar-inner{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);min-height:56px}
+.stats-dash .brand{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:var(--fs-md);color:var(--text);text-decoration:none}
+.stats-dash .brand:hover{color:var(--text)}
+.stats-dash .brand svg{width:22px;height:22px;flex:none}
+.stats-dash nav.main{display:flex;gap:var(--space-1)}
+.stats-dash nav.main a{color:var(--text-2);text-decoration:none;font-size:var(--fs-sm);font-weight:500;padding:6px 10px;border-radius:var(--radius-sm)}
+.stats-dash nav.main a:hover{background:var(--surface-2);color:var(--text)}
+.stats-dash nav.main a[aria-current=page]{color:var(--text);background:var(--surface-2);font-weight:600}
+.stats-dash .wrap{padding-top:var(--space-5);padding-bottom:var(--space-4)}
+</style>
 </head>
-<body>
-<div class="wrap stats-dash">
-<header class="top">
-<a class="brand" href="{{ route('stats.dashboard') }}">{{ __('stats::dashboard.brand') }}</a>
-<nav class="main" aria-label="{{ __('stats::dashboard.nav.main') }}"><a href="{{ route('stats.dashboard') }}">{{ __('stats::dashboard.nav.dashboard') }}</a><a href="{{ route('stats.sites.index') }}">{{ __('stats::dashboard.nav.sites') }}</a></nav>
+<body class="stats-dash">
+<header class="appbar">
+<div class="appbar-inner">
+<a class="brand" href="{{ route('stats.dashboard') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="6" fill="var(--accent)"/><path d="M6 16l4-5 3 3 5-6" fill="none" stroke="var(--on-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>{{ __('stats::dashboard.brand') }}</a>
+<nav class="main" aria-label="{{ __('stats::dashboard.nav.main') }}"><a href="{{ route('stats.dashboard') }}"@if (request()->routeIs('stats.dashboard*')) aria-current="page"@endif>{{ __('stats::dashboard.nav.dashboard') }}</a><a href="{{ route('stats.sites.index') }}"@if (request()->routeIs('stats.sites.*')) aria-current="page"@endif>{{ __('stats::dashboard.nav.sites') }}</a></nav>
+</div>
 </header>
+<div class="wrap">
 <main>
 @yield('content')
 </main>

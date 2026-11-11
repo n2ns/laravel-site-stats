@@ -6,6 +6,32 @@ All notable changes to N2N Stats are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Time on page and scroll depth: the script reports them when a page is hidden or left; the
+  `engagement` report shows the average time and the share of page views reaching 10 s, 30 s, 1 min,
+  3 min and 25%, 50%, 75%, 100% scroll per page, and the summary has the average time on page.
+  Visit duration now includes the time on the last page. Adds columns to `stats_daily_pages`
+  (run `php artisan migrate`).
+- Filament pages rebuilt from native Filament components: a statistics page with filters, KPI cards,
+  charts and report tables (tabs load when opened), a Sites resource (create, edit, embed code,
+  server key, delete) and the dashboard widgets. Filament 5 only.
+- Redesigned standalone dashboard: light and dark themes, primary and secondary KPIs with
+  sparklines, a daily chart with a metric selector and tooltips, report cards with top 10, show all
+  and an "All columns" view, a cleaner Sites page, phone layout.
+- The daily series (`timeseries`) also has pages viewed, views per visit, bounce rate, average visit
+  duration and average time on page.
+- `dashboard_enabled` config option to turn off the standalone dashboard and site management pages
+  when the statistics are shown in the host's own admin.
+- `event_locales` report: outbound clicks, downloads and custom events per site language version of
+  the page they happened on, on the dashboard's Events tab and in the API.
+
+### Changed
+
+- Server keys created on the dashboard have the same format as those from `stats:site key`; the site
+  settings rules are shared by the dashboard, the Filament resource and the command, so excluded
+  paths with control characters are now rejected everywhere.
+
 ## [0.1.0] - 2026-11-11
 
 ### Added

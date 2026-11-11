@@ -19,6 +19,12 @@ return [
     'create' => '创建站点',
     'save' => '保存',
     'public_counts_on' => '已公开计数',
+    'embed_title' => '嵌入代码',
+    'key_title' => '服务器密钥',
+    'settings' => '设置',
+    'copy' => '复制',
+    'copied' => '已复制',
+    'copy_failed' => '复制失败：请选中文字后手动复制。',
 
     'fields' => [
         'name' => '名称',
@@ -29,6 +35,14 @@ return [
         'exclude_paths' => '排除的路径，每行一个，以 / 开头（* 匹配任意字符，例如 /admin/*）；这些页面不计入统计',
         'public_counts' => '公开计数',
         'public_counts_help' => '允许任何人无需令牌，通过公开计数接口读取本站任意页面的累计浏览量和自定义事件的累计次数（例如在网站上显示阅读数）。除非你希望公开这些数字，否则请保持关闭。',
+    ],
+    'labels' => [
+        'name' => '名称',
+        'domains' => '域名',
+        'timezone' => '时区',
+        'locales' => '语言版本',
+        'default_locale' => '默认语言',
+        'exclude_paths' => '排除的路径',
     ],
     'attributes' => [
         'name' => '名称',

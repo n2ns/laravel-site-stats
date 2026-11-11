@@ -13,7 +13,9 @@ For each page view or event, the tracking script sends one request with:
   and content group the site declares in meta tags;
 - for custom events, the event name, an optional label and an optional target link; for outbound
   clicks and downloads, the link target and an optional label set by the site;
-- the screen width in pixels.
+- the screen width in pixels;
+- when the page is hidden or left: how many seconds it was visible and how far it was scrolled, in
+  percent.
 
 The request itself also carries the visitor's IP address, User-Agent, `Accept-Language` header
 and, behind Cloudflare, the `CF-IPCountry` header.

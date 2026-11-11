@@ -6,6 +6,7 @@ use Carbon\CarbonImmutable;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\Gate;
+use N2ns\Stats\Filament\Pages\StatsDashboard;
 use N2ns\Stats\Http\View\Dashboard;
 use N2ns\Stats\Http\View\Format;
 use N2ns\Stats\Models\Site;
@@ -39,11 +40,11 @@ class StatsOverview extends StatsOverviewWidget
             foreach (['today', '7d'] as $range) {
                 $summary = $stats->summary($site, ...self::dates(Period::preset($range, $site->timezone)));
                 $comparison = $summary['comparison'];
-                $url = route('stats.dashboard.site', ['publicId' => $site->public_id, 'range' => $range]);
+                $url = StatsDashboard::urlFor($site->public_id, $range);
                 foreach (['visitors', 'pageviews'] as $metric) {
                     $change = Format::change($comparison['current'][$metric], $comparison['previous'][$metric]);
                     $label = __('stats::filament.card', [
-                        'site' => $site->name, 'metric' => __('stats::filament.metrics.'.$metric), 'range' => __('stats::filament.ranges.'.$range),
+                        'site' => $site->name, 'metric' => __('stats::filament.card_metrics.'.$metric), 'range' => __('stats::filament.card_ranges.'.$range),
                     ]);
                     $cards[] = Stat::make($label, Format::number($summary[$metric]))
                         ->description(__('stats::filament.change', [

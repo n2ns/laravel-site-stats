@@ -1,39 +1,96 @@
 @extends('stats::layout')
 @section('title', __('stats::sites.title'))
 @section('content')
+<div class="page-head">
+<h1>{{ __('stats::sites.title') }}</h1>
+<a class="button" href="#new-site">{{ __('stats::sites.new_site') }}</a>
+</div>
+
+<div class="stack">
 @if (session('stats_status'))
-<div class="panel notice" role="status">{{ session('stats_status') }}</div>
+<div class="card notice" role="status">{{ session('stats_status') }}</div>
 @endif
 
 @if (isset($newKey))
-<div class="panel notice" role="status">
-<strong>{{ __('stats::sites.new_key_title') }}</strong>: {{ __('stats::sites.new_key', ['name' => $sites->firstWhere('public_id', $newKey['site'])?->name]) }}
+<div class="card notice" role="status">
+<p class="lead"><strong>{{ __('stats::sites.new_key_title') }}</strong>: {{ __('stats::sites.new_key', ['name' => $sites->firstWhere('public_id', $newKey['site'])?->name]) }}</p>
+<div class="copy-box">
 <pre>{{ $newKey['key'] }}</pre>
+<button type="button" class="secondary" data-copy hidden>{{ __('stats::sites.copy') }}</button>
+</div>
+<p class="copy-status" role="status"></p>
 </div>
 @endif
 
-<section class="panel">
-<h1 style="margin-top:0;font-size:18px">{{ __('stats::sites.title') }}</h1>
 @forelse ($sites as $site)
-<details class="panel" @if ($errors->getBag('edit_'.$site->public_id)->any() || (isset($newKey) && $newKey['site'] === $site->public_id)) open @endif>
-<summary>{{ $site->name }} <span class="muted">· {{ implode(', ', $site->domains) }} · {{ $site->timezone }}@if ($site->locales) · {{ implode(', ', $site->locales) }}@endif @if ($site->public_counts) · {{ __('stats::sites.public_counts_on') }}@endif</span></summary>
-<p><a href="{{ route('stats.dashboard.site', ['publicId' => $site->public_id]) }}">{{ __('stats::sites.open_dashboard') }}</a></p>
-<p class="muted" style="margin-bottom:4px">{{ __('stats::sites.embed') }}</p>
+@php $editing = $errors->getBag('edit_'.$site->public_id)->any(); @endphp
+<section class="card site-card" aria-labelledby="site-{{ $site->public_id }}">
+<div class="card-head">
+<h2 id="site-{{ $site->public_id }}">{{ $site->name }}</h2>
+<a href="{{ route('stats.dashboard.site', ['publicId' => $site->public_id]) }}">{{ __('stats::sites.open_dashboard') }}</a>
+</div>
+<div class="meta">
+<span>{{ implode(', ', $site->domains) }}</span>
+<span class="badge">{{ $site->timezone }}</span>
+@foreach ($site->locales ?? [] as $locale)<span class="badge">{{ $locale }}</span>@endforeach
+@if ($site->public_counts)<span class="badge accent">{{ __('stats::sites.public_counts_on') }}</span>@endif
+</div>
+
+<h3>{{ __('stats::sites.embed_title') }}</h3>
+<p class="help">{{ __('stats::sites.embed') }}</p>
+<div class="copy-box">
 <pre>&lt;script defer data-site="{{ $site->public_id }}" src="{{ $scriptUrl }}"&gt;&lt;/script&gt;</pre>
-@include('stats::partials.site-form', ['site' => $site, 'bag' => 'edit_'.$site->public_id, 'action' => route('stats.sites.update', ['publicId' => $site->public_id]), 'method' => 'PUT', 'submit' => __('stats::sites.save')])
-<form method="post" action="{{ route('stats.sites.key', ['publicId' => $site->public_id]) }}" style="margin-top:12px" @if ($site->server_key_hash) data-confirm="{{ __('stats::sites.rotate_confirm') }}" onsubmit="return confirm(this.dataset.confirm)" @endif>
+<button type="button" class="secondary" data-copy hidden>{{ __('stats::sites.copy') }}</button>
+</div>
+<p class="copy-status" role="status"></p>
+
+<div class="section">
+<h3>{{ __('stats::sites.key_title') }}</h3>
+<form method="post" action="{{ route('stats.sites.key', ['publicId' => $site->public_id]) }}" class="key-row" @if ($site->server_key_hash) data-confirm="{{ __('stats::sites.rotate_confirm') }}" onsubmit="return confirm(this.dataset.confirm)" @endif>
 @csrf
-<p class="muted">{{ __('stats::sites.server_key', ['state' => $site->server_key_hash ? __('stats::sites.key_set') : __('stats::sites.key_not_set')]) }}</p>
+<p>{{ __('stats::sites.server_key', ['state' => $site->server_key_hash ? __('stats::sites.key_set') : __('stats::sites.key_not_set')]) }}</p>
 <button type="submit" class="secondary">{{ $site->server_key_hash ? __('stats::sites.rotate_key') : __('stats::sites.generate_key') }}</button>
 </form>
-</details>
-@empty
-<p class="muted">{{ __('stats::sites.none') }}</p>
-@endforelse
-</section>
+</div>
 
-<section class="panel">
-<h2 style="margin-top:0;font-size:16px">{{ __('stats::sites.new_site') }}</h2>
+<details class="section" @if ($editing) open @endif>
+<summary>{{ __('stats::sites.settings') }}</summary>
+@include('stats::partials.site-form', ['site' => $site, 'bag' => 'edit_'.$site->public_id, 'action' => route('stats.sites.update', ['publicId' => $site->public_id]), 'method' => 'PUT', 'submit' => __('stats::sites.save')])
+</details>
+</section>
+@empty
+<div class="card"><p class="empty">{{ __('stats::sites.none') }}</p></div>
+@endforelse
+
+<section class="card" id="new-site" aria-labelledby="new-site-title">
+<div class="card-head"><h2 id="new-site-title">{{ __('stats::sites.new_site') }}</h2></div>
 @include('stats::partials.site-form', ['site' => null, 'bag' => 'create', 'action' => route('stats.sites.store'), 'method' => 'POST', 'submit' => __('stats::sites.create')])
 </section>
+</div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+  var copied = @json(__('stats::sites.copied')), failed = @json(__('stats::sites.copy_failed'));
+  document.querySelectorAll('[data-copy]').forEach(function (button) {
+    var source = button.closest('.copy-box').querySelector('pre');
+    var status = button.closest('.copy-box').nextElementSibling;
+    if (!source || !navigator.clipboard) return;
+    button.hidden = false;
+    button.addEventListener('click', function () {
+      navigator.clipboard.writeText(source.textContent).then(function () {
+        if (status) status.textContent = copied;
+      }, function () {
+        if (status) status.textContent = failed;
+        var range = document.createRange();
+        range.selectNodeContents(source);
+        var selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+      });
+    });
+  });
+})();
+</script>
+@endpush

@@ -2,6 +2,8 @@
 
 namespace N2ns\Stats\Http\View;
 
+use Carbon\CarbonImmutable;
+
 /** Number formatting for the dashboard views. */
 final class Format
 {
@@ -47,5 +49,25 @@ final class Format
         }
 
         return ($change > 0 ? '+' : ($change < 0 ? '−' : '±')).number_format(abs($change) * 100, 1).'%';
+    }
+
+    /** Short axis number: 950 => "950", 1200 => "1.2k", 3400000 => "3.4M" */
+    public static function compact(int $value): string
+    {
+        foreach ([1_000_000_000 => 'B', 1_000_000 => 'M', 1_000 => 'k'] as $unit => $suffix) {
+            if ($value >= $unit) {
+                $short = round($value / $unit, $value >= 10 * $unit ? 0 : 1);
+
+                return rtrim(rtrim(number_format($short, 1, '.', ''), '0'), '.').$suffix;
+            }
+        }
+
+        return (string) $value;
+    }
+
+    /** A Y-m-d date in one of the dashboard's date formats ('day', 'weekday', ...), in the app locale. */
+    public static function date(string $date, string $format = 'day'): string
+    {
+        return CarbonImmutable::parse($date)->locale(app()->getLocale())->isoFormat((string) __('stats::dashboard.date_formats.'.$format));
     }
 }

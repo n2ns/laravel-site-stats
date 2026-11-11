@@ -19,6 +19,12 @@ return [
     'create' => 'Create site',
     'save' => 'Save',
     'public_counts_on' => 'public counts on',
+    'embed_title' => 'Embed code',
+    'key_title' => 'Server key',
+    'settings' => 'Settings',
+    'copy' => 'Copy',
+    'copied' => 'Copied',
+    'copy_failed' => 'Copy failed: select the text and copy it manually.',
 
     'fields' => [
         'name' => 'Name',
@@ -29,6 +35,15 @@ return [
         'exclude_paths' => 'Excluded paths, one per line, each starting with / (* matches any characters, e.g. /admin/*); these pages are never counted',
         'public_counts' => 'Public counts',
         'public_counts_help' => 'Lets anyone, without a token, read the all-time pageview counts of any page and the counts of custom events of this site through the public counts endpoint (e.g. to show view counters on the site). Leave off unless you want these numbers to be public.',
+    ],
+    // Short field labels; the longer 'fields' texts are shown as help under each field.
+    'labels' => [
+        'name' => 'Name',
+        'domains' => 'Domains',
+        'timezone' => 'Timezone',
+        'locales' => 'Language versions',
+        'default_locale' => 'Default language',
+        'exclude_paths' => 'Excluded paths',
     ],
     'attributes' => [
         'name' => 'name',

@@ -51,7 +51,7 @@ it('compares with the previous period of equal length', function () {
         ->and($s['comparison']['current']['visitors'])->toBe(10)
         ->and($s['comparison']['previous'])->toBe([
             'visitors' => 5, 'visits' => 6, 'pageviews' => 12, 'pages' => 0, 'views_per_visit' => 2.0,
-            'bounce_rate' => 0.1667, 'avg_duration_seconds' => 13, 'events' => 0, 'outbound' => 0,
+            'bounce_rate' => 0.1667, 'avg_duration_seconds' => 13, 'avg_page_seconds' => 0, 'events' => 0, 'outbound' => 0,
         ]);
 });
 
@@ -89,16 +89,19 @@ it('returns zeros without division errors when there is no data', function () {
 });
 
 it('zero-fills the daily series in site-local dates', function () {
-    S::totals($this->site, '2026-02-27', ['visitors' => 2, 'visits' => 3, 'pageviews' => 4, 'events' => 3, 'outbound' => 1]);
+    S::totals($this->site, '2026-02-27', ['visitors' => 2, 'visits' => 3, 'pageviews' => 4, 'events' => 3, 'outbound' => 1, 'bounces' => 1, 'duration_seconds' => 120]);
+    S::page($this->site, '2026-02-27', '/a', ['pageviews' => 3, 'engaged_views' => 2, 'engaged_seconds' => 30]);
+    S::page($this->site, '2026-02-27', '/b', ['pageviews' => 1]);
+    S::page($this->site, '2026-02-27', '/entry-only', ['pageviews' => 0]);
     S::totals($this->site, '2026-03-01', ['visitors' => 5, 'visits' => 6, 'pageviews' => 7]);
 
     $series = $this->q->timeseries($this->site, d('2026-02-27'), d('2026-03-02'));
 
     expect($series)->toBe([
-        ['date' => '2026-02-27', 'visitors' => 2, 'visits' => 3, 'pageviews' => 4, 'events' => 3, 'outbound' => 1],
-        ['date' => '2026-02-28', 'visitors' => 0, 'visits' => 0, 'pageviews' => 0, 'events' => 0, 'outbound' => 0],
-        ['date' => '2026-03-01', 'visitors' => 5, 'visits' => 6, 'pageviews' => 7, 'events' => 0, 'outbound' => 0],
-        ['date' => '2026-03-02', 'visitors' => 0, 'visits' => 0, 'pageviews' => 0, 'events' => 0, 'outbound' => 0],
+        ['date' => '2026-02-27', 'visitors' => 2, 'visits' => 3, 'pageviews' => 4, 'events' => 3, 'outbound' => 1, 'pages' => 2, 'views_per_visit' => 1.33, 'bounce_rate' => 0.3333, 'avg_duration_seconds' => 40, 'avg_page_seconds' => 15],
+        ['date' => '2026-02-28', 'visitors' => 0, 'visits' => 0, 'pageviews' => 0, 'events' => 0, 'outbound' => 0, 'pages' => 0, 'views_per_visit' => 0.0, 'bounce_rate' => 0.0, 'avg_duration_seconds' => 0, 'avg_page_seconds' => 0],
+        ['date' => '2026-03-01', 'visitors' => 5, 'visits' => 6, 'pageviews' => 7, 'events' => 0, 'outbound' => 0, 'pages' => 0, 'views_per_visit' => 1.17, 'bounce_rate' => 0.0, 'avg_duration_seconds' => 0, 'avg_page_seconds' => 0],
+        ['date' => '2026-03-02', 'visitors' => 0, 'visits' => 0, 'pageviews' => 0, 'events' => 0, 'outbound' => 0, 'pages' => 0, 'views_per_visit' => 0.0, 'bounce_rate' => 0.0, 'avg_duration_seconds' => 0, 'avg_page_seconds' => 0],
     ]);
 });
 
@@ -291,13 +294,14 @@ it('counts visits active in the last five minutes', function () {
 });
 
 it('returns rows with exactly the documented columns', function (string $report) {
-    S::page($this->site, '2026-03-01', '/', ['pageviews' => 1, 'visitors' => 1, 'entries' => 1, 'exits' => 1, 'page_type' => 'home', 'content_group' => 'home']);
+    S::page($this->site, '2026-03-01', '/', ['pageviews' => 1, 'visitors' => 1, 'entries' => 1, 'exits' => 1, 'page_type' => 'home', 'content_group' => 'home', 'engaged_views' => 1, 'engaged_seconds' => 5]);
     S::source($this->site, '2026-03-01', 'utm', 'x', ['visits' => 1, 'visitors' => 1, 'pageviews' => 1, 'bounces' => 0], ['utm_medium' => 'm', 'utm_campaign' => 'c', 'utm_content' => null, 'utm_term' => null]);
     S::source($this->site, '2026-03-01', 'ai', 'chatgpt.com', ['visits' => 1, 'visitors' => 1, 'pageviews' => 1, 'bounces' => 0]);
     S::transition($this->site, '2026-03-01', '/', '/a', 1, 1);
     foreach (['utm' => 'x', 'search' => 'google.com', 'ai' => 'chatgpt.com'] as $type => $source) {
         S::entry($this->site, '2026-03-01', '/', $type, $source, 1, 1, 'c');
     }
+    $this->site->update(['locales' => ['zh'], 'default_locale' => 'en']);
     foreach (['country', 'device', 'browser', 'os', 'language', 'locale'] as $dimension) {
         S::dimension($this->site, '2026-03-01', $dimension, 'v', 1, 1);
     }
@@ -330,4 +334,61 @@ it('breaks ties by every grouped column, so offset pages neither repeat nor skip
     ])
         ->and(array_column($this->q->breakdown($this->site, 'search_pages', $from, $to), 'source'))->toBe(['alpha.com', 'mid.com', 'zeta.com'])
         ->and(array_column($this->q->breakdown($this->site, 'events', $from, $to), 'target'))->toBe(['https://a.example/', 'https://z.example/']);
+});
+
+it('reports events per site language version of the page they happened on', function () {
+    $this->site->update(['locales' => ['cn', 'de'], 'default_locale' => 'en']);
+    S::event($this->site, '2026-03-01', 'custom', 'cta.install', null, '/wtfaa', 5, 4, 'wtfaa');
+    S::event($this->site, '2026-03-02', 'custom', 'cta.install', null, '/pricing', 1, 1, 'wtfaa');
+    S::event($this->site, '2026-03-01', 'custom', 'cta.install', null, '/cn/wtfaa', 3, 3, 'wtfaa');
+    S::event($this->site, '2026-03-01', 'outbound', '', 'https://github.com/x', '/de/wtfaa', 2, 2);
+    S::event($this->site, '2026-03-01', 'ai_fetch', 'gptbot', null, '/cn/wtfaa', 9);
+
+    [$from, $to] = [d('2026-03-01'), d('2026-03-02')];
+
+    expect($this->q->breakdown($this->site, 'event_locales', $from, $to))->toBe([
+        ['locale' => 'en', 'kind' => 'custom', 'name' => 'cta.install', 'count' => 6, 'visitors' => 5],
+        ['locale' => 'cn', 'kind' => 'custom', 'name' => 'cta.install', 'count' => 3, 'visitors' => 3],
+        ['locale' => 'de', 'kind' => 'outbound', 'name' => '', 'count' => 2, 'visitors' => 2],
+    ])
+        ->and($this->q->breakdown($this->site, 'event_locales', $from, $to, 1, 1))->toBe([
+            ['locale' => 'cn', 'kind' => 'custom', 'name' => 'cta.install', 'count' => 3, 'visitors' => 3],
+        ])
+        ->and($this->q->breakdown($this->site, 'event_locales', $from, $to, 50, 0, 3))->toHaveCount(2)
+        ->and($this->q->total($this->site, 'event_locales', $from, $to))->toBe(11);
+
+    $this->site->update(['locales' => null]);
+    expect($this->q->breakdown($this->site, 'event_locales', $from, $to))->toBe([]);
+});
+
+it('reports time on page and scroll depth per page, and the average time on page', function () {
+    S::page($this->site, '2026-03-01', '/guide', ['pageviews' => 6, 'engaged_views' => 4, 'engaged_seconds' => 400, 'time_10' => 4, 'time_30' => 3, 'time_60' => 2, 'time_180' => 1, 'scroll_25' => 4, 'scroll_50' => 3, 'scroll_75' => 2, 'scroll_100' => 1, 'title' => 'Guide']);
+    S::page($this->site, '2026-03-02', '/guide', ['pageviews' => 1, 'engaged_views' => 1, 'engaged_seconds' => 5, 'scroll_25' => 1]);
+    S::page($this->site, '2026-03-01', '/home', ['pageviews' => 9, 'engaged_views' => 0]);
+
+    [$from, $to] = [d('2026-03-01'), d('2026-03-02')];
+
+    expect($this->q->breakdown($this->site, 'engagement', $from, $to))->toBe([[
+        'path' => '/guide', 'title' => 'Guide', 'engaged_views' => 5, 'avg_seconds' => 81,
+        'time_10' => 0.8, 'time_30' => 0.6, 'time_60' => 0.4, 'time_180' => 0.2,
+        'scroll_25' => 1.0, 'scroll_50' => 0.6, 'scroll_75' => 0.4, 'scroll_100' => 0.2,
+    ]])
+        ->and($this->q->summary($this->site, $from, $to)['avg_page_seconds'])->toBe(81)
+        ->and($this->q->total($this->site, 'engagement', $from, $to))->toBe(5);
+});
+
+it('handles page rows that only carry engagement (a page view reported after midnight)', function () {
+    // Opened on the 1st, reported on the 2nd: the 2nd has seconds and thresholds but no page view and no measured view.
+    S::page($this->site, '2026-03-01', '/late', ['pageviews' => 1, 'engaged_views' => 1, 'engaged_seconds' => 20, 'time_10' => 1, 'scroll_25' => 1]);
+    S::page($this->site, '2026-03-02', '/late', ['pageviews' => 0, 'engaged_views' => 0, 'engaged_seconds' => 40, 'time_30' => 1]);
+
+    $day2 = d('2026-03-02');
+    expect($this->q->summary($this->site, $day2, $day2)['avg_page_seconds'])->toBe(0)
+        ->and($this->q->timeseries($this->site, $day2, $day2)[0]['avg_page_seconds'])->toBe(0)
+        ->and($this->q->breakdown($this->site, 'pages', $day2, $day2))->toBe([])
+        ->and($this->q->breakdown($this->site, 'engagement', d('2026-03-01'), $day2))->toBe([[
+            'path' => '/late', 'title' => null, 'engaged_views' => 1, 'avg_seconds' => 60,
+            'time_10' => 1.0, 'time_30' => 1.0, 'time_60' => 0.0, 'time_180' => 0.0,
+            'scroll_25' => 1.0, 'scroll_50' => 0.0, 'scroll_75' => 0.0, 'scroll_100' => 0.0,
+        ]]);
 });

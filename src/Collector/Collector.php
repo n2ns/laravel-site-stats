@@ -99,6 +99,12 @@ class Collector
             return;
         }
 
+        if ($payload->type === 'engagement') {
+            $this->recorder->recordEngagement($site, $visitorHash, $now, $path, $payload->seconds, $payload->scroll, $payload->previousSeconds, $payload->previousScroll);
+
+            return;
+        }
+
         $target = $payload->target === null ? null : $this->paths->cleanUrl($payload->target);
         if ($payload->type !== 'event' && $target === null) {
             return;

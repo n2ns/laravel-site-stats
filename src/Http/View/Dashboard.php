@@ -13,10 +13,10 @@ final class Dashboard
 {
     /** Report tabs, each a group of report tables; together they cover every report in StatsQuery::REPORTS. */
     public const TABS = [
-        'pages' => ['pages', 'entries', 'exits', 'page_types', 'content', 'transitions'],
+        'pages' => ['pages', 'entries', 'exits', 'engagement', 'page_types', 'content', 'transitions'],
         'sources' => ['source_types', 'sources', 'campaigns', 'landing_pages', 'campaign_pages', 'search_pages'],
         'visitors' => ['countries', 'devices', 'browsers', 'os', 'languages', 'locales'],
-        'events' => ['events', 'outbound', 'downloads', 'event_pages'],
+        'events' => ['events', 'outbound', 'downloads', 'event_pages', 'event_locales'],
         'ai' => ['ai_referrals', 'ai_pages', 'ai_fetchers', 'ai_fetched_pages'],
     ];
 
@@ -26,10 +26,42 @@ final class Dashboard
     /** Metrics of the daily chart and its data table. */
     public const CHART_METRICS = ['visitors', 'visits', 'pageviews', 'events', 'outbound'];
 
+    /** Metrics of the daily AI chart. */
+    public const AI_CHART_METRICS = ['visits', 'visitors', 'fetches'];
+
+    /** Rows a report card shows before "show all". */
+    public const TOP_ROWS = 10;
+
+    /**
+     * Summary metrics: [format, lower is better, primary]. Primary metrics lead the KPI strip;
+     * metrics with a daily series get a sparkline (see kpis()).
+     */
+    public const KPIS = [
+        'visitors' => ['number', false, true],
+        'visits' => ['number', false, true],
+        'pageviews' => ['number', false, true],
+        'bounce_rate' => ['percent', true, true],
+        'avg_duration_seconds' => ['duration', false, true],
+        'pages' => ['number', false, false],
+        'views_per_visit' => ['decimal', false, false],
+        'avg_page_seconds' => ['duration', false, false],
+        'events' => ['number', false, false],
+        'outbound' => ['number', false, false],
+    ];
+
+    /** Report columns that hold the share of page views reaching a time or scroll threshold. */
+    private const RATE_COLUMNS = ['time_10', 'time_30', 'time_60', 'time_180', 'scroll_25', 'scroll_50', 'scroll_75', 'scroll_100'];
+
+    public static function isRate(string $column): bool
+    {
+        return in_array($column, self::RATE_COLUMNS, true);
+    }
+
     /** Report columns whose values are text (everything else is a number). */
     private const TEXT_COLUMNS = [
         'path', 'title', 'page_type', 'content_group', 'from_path', 'to_path', 'source_type', 'source', 'utm_medium',
         'utm_campaign', 'utm_content', 'utm_term', 'value', 'target', 'label', 'name', 'kind', 'fetch_type',
+        'locale',
     ];
 
     /**
@@ -72,13 +104,17 @@ final class Dashboard
             }
         }
 
+        $summary = $stats->summary($site, $period->from, $period->to);
+        $series = $stats->timeseries($site, $period->from, $period->to);
+
         return [
             'site' => $site,
             'range' => $range,
             'period' => $period,
             'rangeError' => $error,
-            'summary' => $stats->summary($site, $period->from, $period->to),
-            'series' => $stats->timeseries($site, $period->from, $period->to),
+            'summary' => $summary,
+            'series' => $series,
+            'kpis' => self::kpis($summary, $series),
             'ai' => $stats->ai($site, $period->from, $period->to),
             'realtime' => $stats->realtimeVisitors($site),
             'tabs' => self::TABS,
@@ -88,6 +124,115 @@ final class Dashboard
                 ? ['range' => 'custom', 'from' => $period->from->toDateString(), 'to' => $period->to->toDateString()]
                 : ['range' => $range],
         ];
+    }
+
+    /**
+     * The KPI strip: formatted value, change over complete days with its tone, and a sparkline of the daily series.
+     *
+     * @param  array<string, mixed>  $summary  StatsQuery::summary()
+     * @param  list<array<string, int|float|string>>  $series  StatsQuery::timeseries()
+     * @return list<array{key: string, primary: bool, value: string, current: string, previous: string, change: float|null, delta: string, direction: string, tone: string, spark: string|null}>
+     */
+    public static function kpis(array $summary, array $series): array
+    {
+        /** @var array{current: array<string, int|float>, previous: array<string, int|float>} $comparison */
+        $comparison = $summary['comparison'];
+        $out = [];
+        foreach (self::KPIS as $key => [$format, $lowerIsBetter, $primary]) {
+            $current = $comparison['current'][$key];
+            $previous = $comparison['previous'][$key];
+            $change = Format::change($current, $previous);
+            $direction = $change === null || $change == 0 ? 'flat' : ($change > 0 ? 'up' : 'down');
+            $out[] = [
+                'key' => $key,
+                'primary' => $primary,
+                'value' => self::formatKpi($format, $summary[$key]),
+                'current' => self::formatKpi($format, $current),
+                'previous' => self::formatKpi($format, $previous),
+                'change' => $change,
+                'delta' => Format::signedPercent($change),
+                'direction' => $direction,
+                'tone' => $direction === 'flat' ? 'flat' : ((($direction === 'up') !== $lowerIsBetter) ? 'good' : 'bad'),
+                'spark' => LineChart::sparkline(self::daily($series, $key)),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Daily values of a summary metric, or [] when the daily series does not have it.
+     *
+     * @param  list<array<string, int|float|string>>  $series
+     * @return list<int|float>
+     */
+    public static function daily(array $series, string $metric): array
+    {
+        if ($series === [] || ! array_key_exists($metric, $series[0])) {
+            return [];
+        }
+
+        return array_map(fn (array $row): int|float => is_float($row[$metric]) ? $row[$metric] : (int) $row[$metric], $series);
+    }
+
+    private static function formatKpi(string $format, mixed $value): string
+    {
+        $number = is_numeric($value) ? $value + 0 : 0;
+
+        return match ($format) {
+            'percent' => Format::percent($number),
+            'duration' => Format::duration((int) $number),
+            'decimal' => Format::number($number, 2),
+            default => Format::number($number),
+        };
+    }
+
+    /**
+     * How a report card is laid out: the label column, the other text columns shown under the label,
+     * the main metric, and whether a details view with every column is needed.
+     *
+     * @return array{label: string, sub: list<string>, metric: string, details: bool}
+     */
+    public static function layout(string $report): array
+    {
+        $columns = StatsQuery::COLUMNS[$report];
+        $metric = StatsQuery::mainMetric($report);
+        $text = array_values(array_filter($columns, self::isText(...)));
+        $numbers = array_filter($columns, fn (string $c): bool => ! self::isText($c) && $c !== $metric);
+
+        return ['label' => $text[0], 'sub' => array_slice($text, 1), 'metric' => $metric, 'details' => $numbers !== []];
+    }
+
+    /** Display text of any report cell: percentages, durations, numbers, or the translated text. */
+    public static function cell(string $report, string $column, int|float|string|null $value): string
+    {
+        if ($column === 'bounce_rate' || self::isRate($column)) {
+            return Format::percent((float) $value);
+        }
+        if ($column === 'avg_seconds') {
+            return Format::duration((int) $value);
+        }
+        if (! self::isText($column)) {
+            return Format::number((int) $value);
+        }
+
+        return self::text($report, $column, $value === null ? null : (string) $value);
+    }
+
+    /**
+     * Data of a chart for its hover tooltip: formatted dates, metric labels, values and axis maxima.
+     *
+     * @param  array{layers: array<string, array{top: int, values: list<int>}>, dates: list<string>}  $chart  LineChart::build()
+     * @return array{dates: list<string>, metrics: array<string, array{label: string, values: list<int>, top: int}>}
+     */
+    public static function tooltip(array $chart): array
+    {
+        $metrics = [];
+        foreach ($chart['layers'] as $metric => $layer) {
+            $metrics[$metric] = ['label' => (string) __('stats::dashboard.metrics.'.$metric), 'values' => $layer['values'], 'top' => $layer['top']];
+        }
+
+        return ['dates' => array_map(fn (string $d): string => Format::date($d, 'weekday'), $chart['dates']), 'metrics' => $metrics];
     }
 
     public static function isText(string $column): bool
@@ -138,7 +283,7 @@ final class Dashboard
      * Slices of a donut chart: the top rows by the report's main metric plus "other" for the rest of the total.
      *
      * @param  list<array<string, int|float|string|null>>  $rows
-     * @return list<array{label: string, value: int, share: float, offset: float}>
+     * @return list<array{label: string, value: int, other: bool, share: float, offset: float}>
      */
     public static function donut(string $report, array $rows, int $total, int $top = 5): array
     {
@@ -152,10 +297,10 @@ final class Dashboard
         foreach (array_slice($rows, 0, $top) as $row) {
             $value = (int) $row[$metric];
             $sum += $value;
-            $slices[] = ['label' => self::text($report, $key, $row[$key] === null ? null : (string) $row[$key]), 'value' => $value];
+            $slices[] = ['label' => self::text($report, $key, $row[$key] === null ? null : (string) $row[$key]), 'value' => $value, 'other' => false];
         }
         if ($total > $sum) {
-            $slices[] = ['label' => (string) __('stats::dashboard.other'), 'value' => $total - $sum];
+            $slices[] = ['label' => (string) __('stats::dashboard.other'), 'value' => $total - $sum, 'other' => true];
         }
 
         $offset = 0.0;
