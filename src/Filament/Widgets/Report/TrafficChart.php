@@ -19,6 +19,9 @@ class TrafficChart extends ChartWidget
     // At the top of the page: rendered with it.
     protected static ?bool $isLazyLoaded = false;
 
+    // Statistics change by the minute; Filament's charts would otherwise ask the server again every 5 s.
+    protected ?string $pollingInterval = null;
+
     public const METRICS = ['visitors', 'visits', 'pageviews', 'events', 'outbound'];
 
     protected int|string|array $columnSpan = 'full';

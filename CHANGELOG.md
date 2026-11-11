@@ -6,6 +6,19 @@ All notable changes to N2N Stats are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The report tabs stand out: larger, semibold labels, the selected tab filled with the primary colour (the panel's
+  inside Filament).
+
+### Fixed
+
+- Filament statistics page: the widgets of the report tabs load when their tab is shown, as intended. Before,
+  every tab rendered with the page (slow to open), and the AI figures' sparklines, drawn while their tab was
+  hidden, grew tall enough to cover part of the tab bar, so some tabs could no longer be clicked.
+- The charts of the Filament statistics page no longer ask the server for new data every 5 seconds.
+- `/index.php/pricing` (the front controller in the URL) counts as `/pricing`, and `/index.php` as `/`.
+
 ## [0.1.4] - 2026-11-11
 
 ### Added

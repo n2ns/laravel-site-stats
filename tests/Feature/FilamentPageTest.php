@@ -58,16 +58,18 @@ it('renders the statistics page natively with KPIs, the chart and every report t
         ->assertSeeInOrder(['Visitors', '1,234', '+23.4% vs previous period', 'Bounce rate', '20.0%', '+100.0% vs previous period', 'Outbound clicks', '2', 'Realtime'])
         ->assertSee('Daily traffic')
         ->assertSee('fi-wi-chart', false)
-        ->assertSee('google.com')
-        ->assertSee('/pricing')
-        ->assertSee('100.0%')
         ->assertDontSee('/stats/sites/', false);
     foreach (array_keys(Dashboard::TABS) as $tab) {
         $response->assertSee(__('stats::filament.tabs.'.$tab));
     }
+
+    // Every report of the tabs, loaded when its tab is shown.
+    $filters = ['site' => $site->public_id, 'range' => '7d'];
     foreach (StatsQuery::REPORTS as $report) {
-        $response->assertSee(__('stats::reports.titles.'.$report));
+        Livewire::test(ReportTable::class, ['report' => $report, 'pageFilters' => $filters])->assertSee(__('stats::reports.titles.'.$report));
     }
+    Livewire::test(ReportTable::class, ['report' => 'sources', 'pageFilters' => $filters])->assertSee('google.com');
+    Livewire::test(ReportTable::class, ['report' => 'pages', 'pageFilters' => $filters])->assertSeeInOrder(['/pricing', '100.0%']);
 });
 
 it('colours the KPI changes by whether they are better, with lower bounce rates better', function () {
@@ -175,6 +177,26 @@ it('deals the widgets of a tab out to a left and a right column after the wide o
         ->and($html)->toContain('.stats-column>.fi-grid>.fi-grid-col>.fi-sc-component{display:contents}');
 });
 
+it('loads the widgets of the report tabs only when their tab is shown, and polls none of them', function () {
+    FilamentPanel::allowStats();
+    $site = S::site('Alpha');
+    S::totals($site, '2026-03-09', ['visitors' => 3, 'visits' => 3, 'pageviews' => 3]);
+
+    $html = $this->get('/admin/stats?filters[site]='.$site->public_id.'&filters[range]=7d')->assertOk()->getContent();
+
+    // The key figures and the daily chart render with the page; the widgets of the tabs are placeholders until
+    // shown (a chart drawn in a hidden tab gets the wrong size: the AI figures' sparklines covered the tab bar).
+    expect($html)->toContain('Daily traffic')
+        ->not->toContain('AI visits')
+        ->not->toContain(__('stats::dashboard.charts.page_flow.description'))
+        ->not->toContain(__('stats::reports.titles.pages'));
+    foreach ([Kpis::class, TrafficChart::class, AiKpis::class, AiChart::class, ReportChart::class, ReportTable::class, TabChart::class] as $widget) {
+        if (method_exists($widget, 'getPollingInterval')) {
+            expect(invade(new $widget)->getPollingInterval())->toBeNull(); // statistics change by the minute, not every 5 s
+        }
+    }
+});
+
 it('formats report tables, pages them by 25 and sorts and searches them', function () {
     FilamentPanel::allowStats();
     $site = S::site('Alpha');
@@ -260,11 +282,12 @@ it('renders the statistics page in Simplified Chinese', function () {
 
     $this->get('/admin/stats?filters[range]=15d')->assertOk()
         ->assertSee('最近 15 天')
-        ->assertSee('热门页面')
         ->assertSee('每日流量')
         ->assertSee('较上一时段')
         ->assertSee('页面')
         ->assertDontSee('stats::');
+    Livewire::test(ReportTable::class, ['report' => 'pages', 'pageFilters' => ['site' => $site->public_id, 'range' => '15d']])
+        ->assertSee('热门页面')->assertDontSee('stats::');
 });
 
 it('hides the site filter when there is a single site', function () {

@@ -150,9 +150,9 @@
 
 /* Tabs */
 .stats-dash .tabs{display:flex;gap:var(--space-1);padding:var(--space-2);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--card-shadow);margin-bottom:var(--space-4);overflow-x:auto;scrollbar-width:thin}
-.stats-dash .tabs button{background:transparent;color:var(--muted);border:0;box-shadow:none;border-radius:var(--radius-sm);font-weight:500;font-size:var(--fs-sm);padding:8px 12px;white-space:nowrap}
+.stats-dash .tabs button{background:transparent;color:var(--text-2);border:0;box-shadow:none;border-radius:var(--radius-sm);font-weight:600;font-size:15px;padding:8px 14px;white-space:nowrap}
 .stats-dash .tabs button:hover{background:var(--surface-2);color:var(--text)}
-.stats-dash .tabs button[aria-selected=true]{color:var(--accent);background:var(--accent-soft)}
+.stats-dash .tabs button[aria-selected=true]{color:#09090b;background:var(--s0)}
 .stats-dash .tabpanel>.kpis{margin-bottom:var(--space-4)}
 .stats-dash .tabpanel>.chart{margin-bottom:var(--space-4)}
 
@@ -212,6 +212,11 @@
 .fi-wi-widget .fi-section-header,.fi-wi-widget .fi-ta-header{background:color-mix(in oklab,currentColor 6%,transparent);border-bottom:1px solid color-mix(in oklab,currentColor 12%,transparent);border-radius:var(--radius-xl,12px) var(--radius-xl,12px) 0 0}
 .fi-wi-widget .fi-section,.fi-wi-widget .fi-ta-ctn,.fi-wi-stats-overview-stat{box-shadow:0 1px 2px rgba(15,18,25,.08),0 6px 18px rgba(15,18,25,.10)}
 .dark .fi-wi-widget .fi-section,.dark .fi-wi-widget .fi-ta-ctn,.dark .fi-wi-stats-overview-stat{box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 4px rgba(0,0,0,.45),0 12px 28px rgba(0,0,0,.55)}
+
+/* Filament statistics page: the report tabs, larger and with the selected one in the panel's primary colour */
+.stats-tabs .fi-tabs-item{font-size:15px;font-weight:600}
+.stats-tabs .fi-tabs-item.fi-active{background:var(--primary-500,#f59e0b)}
+.stats-tabs .fi-tabs-item.fi-active .fi-tabs-item-label{color:var(--gray-950,#09090b)}
 
 /* Filament statistics page: its two widget columns (Pages\StatsDashboard) fold into one in the original order */
 @media (max-width:1023.98px){

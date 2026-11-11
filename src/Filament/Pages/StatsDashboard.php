@@ -177,7 +177,8 @@ class StatsDashboard extends Page
             ]).' '.($selection->period->isPartial($today) ? __('stats::filament.partial') : '')))->color('gray'),
             $this->widget(Kpis::class, 'kpis'),
             $this->widget(TrafficChart::class, 'traffic'),
-            Tabs::make('reports')->label(__('stats::filament.reports'))->tabs($tabs)->persistTabInQueryString('tab'),
+            Tabs::make('reports')->label(__('stats::filament.reports'))->tabs($tabs)->persistTabInQueryString('tab')
+                ->extraAttributes(['class' => 'stats-tabs']),
             Text::make(__('stats::filament.footer'))->color('gray'),
         ];
     }
@@ -185,7 +186,11 @@ class StatsDashboard extends Page
     /** @param array<string, mixed> $properties */
     private function widget(string $class, string $key, array $properties = []): Livewire
     {
+        // The widgets of the report tabs load when their tab is shown: the page renders fast, and their charts are drawn
+        // visible (a chart drawn in a hidden tab gets a wrong size). A schema component does not read the widget's own
+        // setting, so it is set here; lazy() is in every Filament 5 version (5.11 also calls it lazyLoaded()).
         return Livewire::make($class, fn (): array => [...$properties, 'pageFilters' => $this->filters])
+            ->lazy(! in_array($class, [Kpis::class, TrafficChart::class], true))
             ->key('stats-'.$key);
     }
 }

@@ -17,6 +17,9 @@ class AiChart extends ChartWidget
     // Loaded when its tab is shown, so hidden tabs cost nothing on page load.
     protected static ?bool $isLazyLoaded = true;
 
+    // Statistics change by the minute; Filament's charts would otherwise ask the server again every 5 s.
+    protected ?string $pollingInterval = null;
+
     protected int|string|array $columnSpan = 'full';
 
     protected ?string $maxHeight = '300px';

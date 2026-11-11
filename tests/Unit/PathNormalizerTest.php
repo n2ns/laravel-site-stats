@@ -15,6 +15,12 @@ it('normalizes paths', function (string $input, ?string $expected) {
     ['//evil.com/x', null],
     ["/a\x01b", null],
     ['', null],
+    ['/index.php', '/'],                                  // the front controller in the URL: the same page
+    ['/index.php/', '/'],
+    ['https://example.com/index.php/pricing?x=1', '/pricing'],
+    ['/index.phpx', '/index.phpx'],
+    ['/docs/index.php', '/docs/index.php'],
+    ['/index.php//evil.com/x', null],
 ]);
 
 it('rejects paths over 512 characters', function () {

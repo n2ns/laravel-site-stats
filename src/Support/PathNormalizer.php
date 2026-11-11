@@ -18,6 +18,12 @@ class PathNormalizer
             $path = preg_split('/[?#]/', $urlOrPath, 2)[0] ?? '';
         }
 
+        // /index.php/pricing is /pricing served through the front controller in the URL: count it as that page.
+        if (preg_match('#^/index\.php(?=/|$)#', $path) === 1) {
+            $path = substr($path, strlen('/index.php'));
+            $path = $path === '' ? '/' : $path;
+        }
+
         if ($path === ''
             || ! str_starts_with($path, '/')
             || str_starts_with($path, '//')
