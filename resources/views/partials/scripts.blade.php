@@ -76,7 +76,9 @@
         rows.sort(function (a, b) {
           var x = a.cells[col], y = b.cells[col], r;
           if (x.hasAttribute('data-value')) {
-            r = parseFloat(x.getAttribute('data-value')) - parseFloat(y.getAttribute('data-value'));
+            var xv = parseFloat(x.getAttribute('data-value')), yv = parseFloat(y.getAttribute('data-value'));
+            if (isNaN(xv) || isNaN(yv)) return isNaN(xv) - isNaN(yv); // cells without a value (shown as –) stay last
+            r = xv - yv;
           } else {
             r = x.textContent.localeCompare(y.textContent);
           }

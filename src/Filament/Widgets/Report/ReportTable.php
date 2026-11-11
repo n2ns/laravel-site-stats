@@ -92,7 +92,7 @@ class ReportTable extends TableWidget
                 ->wrap();
         }
 
-        return $text->alignment(Alignment::End)->formatStateUsing(fn (int|float $state): string => match (true) {
+        return $text->alignment(Alignment::End)->placeholder('–')->formatStateUsing(fn (int|float $state): string => match (true) {
             Dashboard::isRate($column), $column === 'bounce_rate' => Format::percent($state),
             $column === 'avg_seconds' => Format::duration((int) $state),
             default => Format::number($state),

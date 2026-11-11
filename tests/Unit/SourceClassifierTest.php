@@ -18,6 +18,13 @@ it('classifies utm parameters first, cleaned and truncated', function () {
         ->and($s->term)->toBe('b');
 });
 
+it('counts an AI assistant that tags its links with utm_source only as AI', function () {
+    expect(classifySource('https://example.com/?utm_source=chatgpt.com', 'https://chatgpt.com/'))->toEqual(new Source('ai', 'chatgpt.com'))
+        ->and(classifySource('https://example.com/?utm_source=www.Perplexity.ai'))->toEqual(new Source('ai', 'perplexity.ai'))
+        ->and(classifySource('https://example.com/?utm_source=chatgpt.com&utm_medium=cpc')->type)->toBe('utm') // a campaign of the site's own
+        ->and(classifySource('https://example.com/?utm_source=chatgpt.com&utm_campaign=launch')->type)->toBe('utm');
+});
+
 it('ignores an empty utm_source', function () {
     expect(classifySource('https://example.com/?utm_source=%20', null)->type)->toBe('direct');
 });

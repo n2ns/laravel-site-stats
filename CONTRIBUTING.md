@@ -8,8 +8,8 @@ can agree on the approach.
 You need PHP 8.3 or newer, Composer and Node.js (for the tracking script's tests).
 
 ```bash
-git clone https://github.com/n2ns/laravel-stats.git
-cd laravel-stats
+git clone https://github.com/n2ns/laravel-site-stats.git
+cd laravel-site-stats
 composer install
 npm ci
 ```

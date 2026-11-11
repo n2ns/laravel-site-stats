@@ -3,7 +3,7 @@
 namespace N2ns\Stats\Support;
 
 /**
- * Classifies the source of a visit (design §5.4): utm > (no referrer: click id or direct)
+ * Classifies the source of a visit (design §5.4): AI assistant's utm_source alone > utm > (no referrer: click id or direct)
  * > (referrer: own site => direct, ai, search, social, click id, referral). AI comes before search so that
  * gemini.google.com is not matched by 'google.'. Lists come from config.
  */
@@ -19,12 +19,19 @@ class SourceClassifier
         parse_str((string) parse_url($pageUrl, PHP_URL_QUERY), $query);
 
         $utmSource = $this->clean($query['utm_source'] ?? null);
+        $utmMedium = $this->clean($query['utm_medium'] ?? null);
+        $utmCampaign = $this->clean($query['utm_campaign'] ?? null);
+        // AI assistants such as ChatGPT tag the links they show with utm_source=<their host> and nothing else.
+        $aiSource = $utmSource === null ? '' : (string) preg_replace('/^www\./', '', strtolower($utmSource));
+        if ($utmMedium === null && $utmCampaign === null && in_array($aiSource, (array) config('stats.ai_hosts', []), true)) {
+            return new Source('ai', $aiSource);
+        }
         if ($utmSource !== null) {
             return new Source(
                 'utm',
                 $utmSource,
-                $this->clean($query['utm_medium'] ?? null),
-                $this->clean($query['utm_campaign'] ?? null),
+                $utmMedium,
+                $utmCampaign,
                 $this->clean($query['utm_content'] ?? null),
                 $this->clean($query['utm_term'] ?? null),
             );

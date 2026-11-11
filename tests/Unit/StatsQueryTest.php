@@ -36,6 +36,15 @@ it('sums the range and derives per-visit metrics', function () {
     ]);
 });
 
+it('derives views per visit only from days that recorded visits', function () {
+    S::totals($this->site, '2026-03-01', ['visitors' => 900, 'visits' => 0, 'pageviews' => 1000]); // imported day without visits
+    S::totals($this->site, '2026-03-02', ['visitors' => 4, 'visits' => 5, 'pageviews' => 15]);
+
+    $s = $this->q->summary($this->site, d('2026-03-01'), d('2026-03-02'));
+
+    expect($s)->toMatchArray(['visits' => 5, 'pageviews' => 1015, 'views_per_visit' => 3.0]);
+});
+
 it('compares with the previous period of equal length', function () {
     S::totals($this->site, '2026-02-26', ['visitors' => 1, 'visits' => 1, 'pageviews' => 1]); // before previous
     S::totals($this->site, '2026-02-27', ['visitors' => 3, 'visits' => 4, 'pageviews' => 9, 'bounces' => 1, 'duration_seconds' => 80]);
@@ -106,26 +115,28 @@ it('zero-fills the daily series in site-local dates', function () {
 });
 
 it('aggregates pages, entries and exits across days', function () {
-    S::page($this->site, '2026-03-01', '/a', ['pageviews' => 5, 'visitors' => 3, 'entries' => 2, 'exits' => 0, 'entry_pageviews' => 6, 'entry_outbound' => 1, 'entry_events' => 2]);
-    S::page($this->site, '2026-03-02', '/a', ['pageviews' => 4, 'visitors' => 2, 'entries' => 1, 'exits' => 0, 'entry_pageviews' => 2, 'title' => 'Home', 'page_type' => 'home']);
+    S::page($this->site, '2026-03-01', '/a', ['pageviews' => 5, 'visitors' => 4, 'entries' => 2, 'entry_visitors' => 2, 'exits' => 0, 'entry_pageviews' => 6, 'entry_outbound' => 1, 'entry_events' => 2]);
+    S::page($this->site, '2026-03-02', '/a', ['pageviews' => 4, 'visitors' => 2, 'entries' => 1, 'entry_visitors' => 1, 'exits' => 0, 'entry_pageviews' => 2, 'title' => 'Home', 'page_type' => 'home']);
     S::page($this->site, '2026-03-01', '/b', ['pageviews' => 7, 'visitors' => 7, 'entries' => 0, 'exits' => 6]);
     S::page($this->site, '2026-03-05', '/c', ['pageviews' => 50, 'visitors' => 50, 'entries' => 50, 'exits' => 50]);
 
     [$from, $to] = [d('2026-03-01'), d('2026-03-02')];
 
     expect($this->q->breakdown($this->site, 'pages', $from, $to))->toBe([
-        ['path' => '/a', 'title' => 'Home', 'page_type' => 'home', 'pageviews' => 9, 'visitors' => 5, 'entries' => 3, 'exits' => 0],
+        ['path' => '/a', 'title' => 'Home', 'page_type' => 'home', 'pageviews' => 9, 'visitors' => 6, 'entries' => 3, 'exits' => 0],
         ['path' => '/b', 'title' => null, 'page_type' => null, 'pageviews' => 7, 'visitors' => 7, 'entries' => 0, 'exits' => 6],
     ])
         ->and($this->q->breakdown($this->site, 'entries', $from, $to))->toBe([
-            ['path' => '/a', 'title' => 'Home', 'entries' => 3, 'visitors' => 5, 'entry_pageviews' => 8, 'entry_outbound' => 1, 'entry_events' => 2],
+            ['path' => '/a', 'title' => 'Home', 'entries' => 3, 'visitors' => 3, 'entry_pageviews' => 8, 'entry_outbound' => 1, 'entry_events' => 2],
         ])
         ->and($this->q->breakdown($this->site, 'exits', $from, $to))->toBe([['path' => '/b', 'title' => null, 'exits' => 6]])
         ->and($this->q->breakdown($this->site, 'pages', $from, $to, 1))->toHaveCount(1)
         ->and($this->q->breakdown($this->site, 'pages', $from, $to, 1, 1))->toBe([
             ['path' => '/b', 'title' => null, 'page_type' => null, 'pageviews' => 7, 'visitors' => 7, 'entries' => 0, 'exits' => 6],
         ])
-        ->and($this->q->breakdown($this->site, 'pages', $from, $to, 50, 0, 6))->toHaveCount(1)
+        ->and($this->q->breakdown($this->site, 'pages', $from, $to, 50, 0, 7))->toHaveCount(1)
+        ->and($this->q->breakdown($this->site, 'entries', $from, $to, 50, 0, 3))->toHaveCount(1)
+        ->and($this->q->breakdown($this->site, 'entries', $from, $to, 50, 0, 4))->toBe([])
         ->and($this->q->total($this->site, 'pages', $from, $to))->toBe(16);
 });
 
@@ -178,24 +189,27 @@ it('reports sources, source types and campaigns', function () {
     S::source($this->site, '2026-03-01', 'search', 'bing.com', ['visits' => 2, 'visitors' => 2, 'pageviews' => 2, 'bounces' => 2]);
     S::source($this->site, '2026-03-01', 'direct', null, ['visits' => 4, 'visitors' => 4, 'pageviews' => 4, 'bounces' => 0]);
     S::source($this->site, '2026-03-01', 'utm', 'newsletter', ['visits' => 3, 'visitors' => 3, 'pageviews' => 6, 'bounces' => 1, 'outbound' => 1, 'events' => 4], $utm);
+    S::source($this->site, '2026-03-01', 'referral', 'old.example', ['visits' => 0, 'visitors' => 5, 'pageviews' => 5]); // imported history without visits
 
     [$from, $to] = [d('2026-03-01'), d('2026-03-02')];
 
     expect($this->q->breakdown($this->site, 'sources', $from, $to))->toBe([
         ['source_type' => 'search', 'source' => 'google.com', 'utm_medium' => null, 'visits' => 20, 'visitors' => 17, 'pageviews' => 35, 'bounce_rate' => 0.4, 'outbound' => 2, 'events' => 1],
+        ['source_type' => 'referral', 'source' => 'old.example', 'utm_medium' => null, 'visits' => 0, 'visitors' => 5, 'pageviews' => 5, 'bounce_rate' => null, 'outbound' => 0, 'events' => 0],
         ['source_type' => 'direct', 'source' => null, 'utm_medium' => null, 'visits' => 4, 'visitors' => 4, 'pageviews' => 4, 'bounce_rate' => 0.0, 'outbound' => 0, 'events' => 0],
         ['source_type' => 'utm', 'source' => 'newsletter', 'utm_medium' => 'email', 'visits' => 3, 'visitors' => 3, 'pageviews' => 6, 'bounce_rate' => 0.3333, 'outbound' => 1, 'events' => 4],
         ['source_type' => 'search', 'source' => 'bing.com', 'utm_medium' => null, 'visits' => 2, 'visitors' => 2, 'pageviews' => 2, 'bounce_rate' => 1.0, 'outbound' => 0, 'events' => 0],
     ])
         ->and($this->q->breakdown($this->site, 'source_types', $from, $to))->toBe([
             ['source_type' => 'search', 'visits' => 22, 'visitors' => 19, 'pageviews' => 37, 'outbound' => 2, 'events' => 1],
+            ['source_type' => 'referral', 'visits' => 0, 'visitors' => 5, 'pageviews' => 5, 'outbound' => 0, 'events' => 0],
             ['source_type' => 'direct', 'visits' => 4, 'visitors' => 4, 'pageviews' => 4, 'outbound' => 0, 'events' => 0],
             ['source_type' => 'utm', 'visits' => 3, 'visitors' => 3, 'pageviews' => 6, 'outbound' => 1, 'events' => 4],
         ])
         ->and($this->q->breakdown($this->site, 'campaigns', $from, $to))->toBe([
             ['source' => 'newsletter', 'utm_medium' => 'email', 'utm_campaign' => 'launch', 'utm_content' => null, 'utm_term' => null, 'visits' => 3, 'visitors' => 3, 'pageviews' => 6, 'outbound' => 1, 'events' => 4],
         ])
-        ->and($this->q->total($this->site, 'source_types', $from, $to))->toBe(29);
+        ->and($this->q->total($this->site, 'source_types', $from, $to))->toBe(31); // visitors: sorted and shared by them, which history without visits also has
 });
 
 it('reports each visitor dimension', function (string $report, string $dimension) {

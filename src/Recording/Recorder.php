@@ -243,7 +243,14 @@ class Recorder
     {
         $this->bump('daily_totals', ['site_id' => $site->id, 'date' => $date], ['visits' => 1]);
         $this->bump('daily_sources', ['site_id' => $site->id, 'date' => $date, 'source_key' => $source->key()], ['visits' => 1], $this->sourceFields($source));
-        $this->bump('daily_pages', ['site_id' => $site->id, 'date' => $date, 'path_hash' => $pathHash], ['entries' => 1], ['path' => $page->path]);
+        $this->bump(
+            'daily_pages',
+            ['site_id' => $site->id, 'date' => $date, 'path_hash' => $pathHash],
+            ['entries' => 1],
+            ['path' => $page->path],
+            [$site->id, $date, 'entry-page:'.$pathHash, $visitorHash],
+            visitorsColumn: 'entry_visitors',
+        );
         $this->bump(
             'daily_entries',
             ['site_id' => $site->id, 'date' => $date, 'path_hash' => $pathHash, 'source_key' => $source->key()],
@@ -359,14 +366,14 @@ class Recorder
      * @param  array{0: int, 1: string, 2: string, 3: string}|null  $unique  [site id, date, scope, visitor hash]
      * @param  array<string, mixed>  $set  columns overwritten on every write (latest page title and type)
      */
-    private function bump(string $table, array $keys, array $increments, array $insert = [], ?array $unique = null, array $set = []): void
+    private function bump(string $table, array $keys, array $increments, array $insert = [], ?array $unique = null, array $set = [], string $visitorsColumn = 'visitors'): void
     {
         $uniqueRow = null;
         if ($unique !== null) {
             $row = ['site_id' => $unique[0], 'date' => $unique[1], 'scope' => hash('sha256', $unique[2]), 'visitor_hash' => $unique[3]];
             if ($this->retry(fn () => DB::table(Tables::name('uniques'))->insertOrIgnore($row)) > 0) {
                 $uniqueRow = $row;
-                $increments['visitors'] = ($increments['visitors'] ?? 0) + 1;
+                $increments[$visitorsColumn] = ($increments[$visitorsColumn] ?? 0) + 1;
             }
         }
 

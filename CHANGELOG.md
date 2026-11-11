@@ -6,6 +6,28 @@ All notable changes to N2N Stats are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The package is renamed from `n2ns/laravel-stats` to `n2ns/laravel-site-stats`, so it is not confused
+  with `spatie/laravel-stats` and `wnx/laravel-stats`. Namespaces, config, tables and routes are unchanged:
+  `composer remove n2ns/laravel-stats && composer require n2ns/laravel-site-stats`.
+- Reports of visits (source types, sources, campaigns, landing pages, AI referrals, countries, devices,
+  browsers, operating systems and languages) are sorted and shared by visitors instead of visits, so
+  imported days without visit data are ranked and shared correctly.
+- Links that AI assistants tag with only `utm_source=<their host>` (such as ChatGPT's
+  `utm_source=chatgpt.com`) count as AI referrals instead of UTM campaigns. `php artisan migrate`
+  moves the sources and landing pages already counted, and the open visits, to AI.
+
+### Fixed
+
+- The entry pages report shows the visitors who entered on each page, instead of all visitors of the
+  page. Adds `entry_visitors` to `stats_daily_pages` (run `php artisan migrate`); earlier days are
+  filled from the landing pages.
+- The bounce rate of a source without visits (such as imported history) shows – instead of 0% (`null`
+  in the API).
+- Views per visit in the summary leaves out days that recorded page views but no visits (such as
+  imported history), instead of dividing their page views by the visits of other days.
+
 ## [0.1.2] - 2026-11-11
 
 ### Added
@@ -77,6 +99,6 @@ All notable changes to N2N Stats are listed here. The format follows
 - Commands `stats:install`, `stats:site`, `stats:token` and `stats:maintain` (scheduled every five
   minutes); configurable retention of aggregates.
 
-[0.1.2]: https://github.com/n2ns/laravel-stats/releases/tag/v0.1.2
-[0.1.1]: https://github.com/n2ns/laravel-stats/releases/tag/v0.1.1
-[0.1.0]: https://github.com/n2ns/laravel-stats/releases/tag/v0.1.0
+[0.1.2]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.2
+[0.1.1]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.1
+[0.1.0]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.0

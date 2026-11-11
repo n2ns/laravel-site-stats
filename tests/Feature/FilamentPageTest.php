@@ -136,6 +136,9 @@ it('formats report tables, pages them by 25 and sorts and searches them', functi
     S::source($site, '2026-03-09', 'search', 'google.com', ['visits' => 10, 'visitors' => 9, 'pageviews' => 12, 'bounces' => 4]);
     Livewire::test(ReportTable::class, ['report' => 'sources', 'pageFilters' => $filters])
         ->assertSeeInOrder(['Search', 'google.com', '10', '9', '12', '40.0%', '100.0%']);
+    S::source($site, '2026-03-08', 'referral', 'old.example', ['visits' => 0, 'visitors' => 9, 'pageviews' => 9]); // imported, no visits
+    Livewire::test(ReportTable::class, ['report' => 'sources', 'pageFilters' => $filters])
+        ->assertSeeInOrder(['old.example', '0', '9', '9', '–', '50.0%', 'google.com', '10', '9', '12', '40.0%', '50.0%']);
     Livewire::test(ReportTable::class, ['report' => 'outbound', 'pageFilters' => $filters])->assertSee('No data for this range.');
 });
 

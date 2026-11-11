@@ -1,8 +1,8 @@
 {
-    "name": "n2ns/laravel-stats",
+    "name": "n2ns/laravel-site-stats",
     "description": "N2N Stats: cookieless web analytics for Laravel, for a single site or many. Only daily aggregates are stored.",
     "keywords": ["laravel", "analytics", "privacy", "cookieless", "statistics", "web-analytics"],
-    "homepage": "https://n2ns.com/projects/laravel-stats",
+    "homepage": "https://n2ns.com/projects/laravel-site-stats",
     "license": "Apache-2.0",
     "authors": [{"name": "Datafrog LLC", "homepage": "https://datafrog.io"}],
     "require": {

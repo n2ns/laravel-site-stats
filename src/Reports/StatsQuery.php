@@ -16,7 +16,7 @@ use N2ns\Stats\Support\Tables;
  */
 class StatsQuery
 {
-    /** Row keys of each report, in order. The first numeric column is the report's main metric (its sort order). */
+    /** Row keys of each report, in order. The main metric (its sort order and share) is mainMetric(). */
     public const COLUMNS = [
         'pages' => ['path', 'title', 'page_type', 'pageviews', 'visitors', 'entries', 'exits'],
         'entries' => ['path', 'title', 'entries', 'visitors', 'entry_pageviews', 'entry_outbound', 'entry_events'],
@@ -189,7 +189,7 @@ class StatsQuery
 
         $query = $this->query($site, $report, $from, $to);
         if ($minVisitors > 0 && in_array('visitors', self::COLUMNS[$report], true)) {
-            $query->havingRaw('SUM(visitors) >= ?', [$minVisitors]);
+            $query->havingRaw('SUM('.($report === 'entries' ? 'entry_visitors' : 'visitors').') >= ?', [$minVisitors]);
         }
         $rows = [];
         foreach ($query->offset(max(0, $offset))->limit(max(1, $limit))->get() as $row) {
@@ -213,12 +213,18 @@ class StatsQuery
         return (int) DB::query()->fromSub($this->query($site, $report, $from, $to), 'r')->sum(self::mainMetric($report));
     }
 
-    /** The column a report is sorted by. */
+    /**
+     * The column a report is sorted by. Reports of visits use their visitors, which days without visit data (such as
+     * imported history) also have.
+     */
     public static function mainMetric(string $report): string
     {
         foreach (self::COLUMNS[$report] as $column) {
-            if (in_array($column, ['pageviews', 'entries', 'exits', 'engaged_views', 'visits', 'count'], true)) {
+            if (in_array($column, ['pageviews', 'entries', 'exits', 'engaged_views', 'count'], true)) {
                 return $column;
+            }
+            if ($column === 'visits') {
+                return 'visitors';
             }
         }
 
@@ -274,14 +280,14 @@ class StatsQuery
         if (isset(self::DIMENSIONS[$report])) {
             return $this->range('daily_dimensions', $site, $from, $to)->where('dimension', self::DIMENSIONS[$report])
                 ->select('value')->selectRaw('SUM(visits) AS visits, SUM(visitors) AS visitors, SUM(pageviews) AS pageviews')
-                ->groupBy('value')->orderByRaw('SUM(visits) DESC')->orderBy('value');
+                ->groupBy('value')->orderByRaw('SUM(visitors) DESC')->orderBy('value');
         }
         if (isset(self::LANDING_TYPES[$report])) {
             $columns = $report === 'campaign_pages' ? ['source', 'utm_campaign', 'path'] : ['source', 'path'];
 
             return $this->range('daily_entries', $site, $from, $to)->where('source_type', self::LANDING_TYPES[$report])
                 ->select($columns)->selectRaw('SUM(visits) AS visits, SUM(visitors) AS visitors')
-                ->groupBy($columns)->orderByRaw('SUM(visits) DESC')->orderBy('path')->orderBy('source')
+                ->groupBy($columns)->orderByRaw('SUM(visitors) DESC')->orderBy('path')->orderBy('source')
                 ->when($report === 'campaign_pages', fn (Builder $q) => $q->orderBy('utm_campaign'));
         }
 
@@ -293,7 +299,7 @@ class StatsQuery
                 ->selectRaw('MAX(title) AS title, MAX(page_type) AS page_type, SUM(pageviews) AS pageviews, SUM(visitors) AS visitors, SUM(entries) AS entries, SUM(exits) AS exits')
                 ->groupBy('path')->havingRaw('SUM(pageviews) > 0')->orderByRaw('SUM(pageviews) DESC')->orderBy('path'),
             'entries' => $this->range('daily_pages', $site, $from, $to)->where('entries', '>', 0)->select('path')
-                ->selectRaw('MAX(title) AS title, SUM(entries) AS entries, SUM(visitors) AS visitors, SUM(entry_pageviews) AS entry_pageviews, SUM(entry_outbound) AS entry_outbound, SUM(entry_events) AS entry_events')
+                ->selectRaw('MAX(title) AS title, SUM(entries) AS entries, SUM(entry_visitors) AS visitors, SUM(entry_pageviews) AS entry_pageviews, SUM(entry_outbound) AS entry_outbound, SUM(entry_events) AS entry_events')
                 ->groupBy('path')->orderByRaw('SUM(entries) DESC')->orderBy('path'),
             // Summed per path first: a page view reported after midnight leaves seconds on a day without a measured view.
             'engagement' => $this->range('daily_pages', $site, $from, $to)->select('path')
@@ -314,17 +320,17 @@ class StatsQuery
                 ->selectRaw('SUM(count) AS count, SUM(visitors) AS visitors')
                 ->groupBy('from_path', 'to_path')->orderByRaw('SUM(count) DESC')->orderBy('from_path')->orderBy('to_path'),
             'source_types' => $this->range('daily_sources', $site, $from, $to)->select('source_type')->selectRaw($sources)
-                ->groupBy('source_type')->orderByRaw('SUM(visits) DESC')->orderBy('source_type'),
+                ->groupBy('source_type')->orderByRaw('SUM(visitors) DESC')->orderBy('source_type'),
             'sources' => $this->range('daily_sources', $site, $from, $to)->select('source_type', 'source', 'utm_medium')
                 ->selectRaw($sources.', SUM(bounces) AS bounces')
-                ->groupBy('source_type', 'source', 'utm_medium')->orderByRaw('SUM(visits) DESC')->orderBy('source_type')->orderBy('source')->orderBy('utm_medium'),
+                ->groupBy('source_type', 'source', 'utm_medium')->orderByRaw('SUM(visitors) DESC')->orderBy('source_type')->orderBy('source')->orderBy('utm_medium'),
             'campaigns' => $this->range('daily_sources', $site, $from, $to)->where('source_type', 'utm')
                 ->select('source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term')->selectRaw($sources)
                 ->groupBy('source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term')
-                ->orderByRaw('SUM(visits) DESC')->orderBy('source')->orderBy('utm_campaign')->orderBy('utm_medium')->orderBy('utm_content')->orderBy('utm_term'),
+                ->orderByRaw('SUM(visitors) DESC')->orderBy('source')->orderBy('utm_campaign')->orderBy('utm_medium')->orderBy('utm_content')->orderBy('utm_term'),
             'landing_pages' => $this->range('daily_entries', $site, $from, $to)->select('source_type', 'source', 'utm_campaign', 'path')
                 ->selectRaw('SUM(visits) AS visits, SUM(visitors) AS visitors')
-                ->groupBy('source_type', 'source', 'utm_campaign', 'path')->orderByRaw('SUM(visits) DESC')->orderBy('path')
+                ->groupBy('source_type', 'source', 'utm_campaign', 'path')->orderByRaw('SUM(visitors) DESC')->orderBy('path')
                 ->orderBy('source_type')->orderBy('source')->orderBy('utm_campaign'),
             'outbound', 'downloads' => $events($report === 'outbound' ? 'outbound' : 'download')
                 ->select('target', 'label')->selectRaw('SUM(count) AS count, SUM(visitors) AS visitors')
@@ -337,7 +343,7 @@ class StatsQuery
                 ->orderBy('kind')->orderBy('label')->orderBy('target'),
             'ai_referrals' => $this->range('daily_sources', $site, $from, $to)->where('source_type', 'ai')->select('source')
                 ->selectRaw('SUM(visits) AS visits, SUM(visitors) AS visitors, SUM(pageviews) AS pageviews')
-                ->groupBy('source')->orderByRaw('SUM(visits) DESC')->orderBy('source'),
+                ->groupBy('source')->orderByRaw('SUM(visitors) DESC')->orderBy('source'),
             'ai_fetchers' => $events('ai_fetch')->select('name')->selectRaw('SUM(count) AS count, COUNT(DISTINCT path_hash) AS pages')
                 ->groupBy('name')->orderByRaw('SUM(count) DESC')->orderBy('name'),
             default => $events('ai_fetch')->select('name', 'path')->selectRaw('SUM(count) AS count') // ai_fetched_pages
@@ -357,7 +363,7 @@ class StatsQuery
             $out[$column] = match ($column) {
                 'avg_seconds' => $views > 0 ? intdiv((int) $row['engaged_seconds'], $views) : 0,
                 'time_10', 'time_30', 'time_60', 'time_180', 'scroll_25', 'scroll_50', 'scroll_75', 'scroll_100' => $views > 0 ? round((int) $row[$column] / $views, 4) : 0.0,
-                'bounce_rate' => (int) $row['visits'] > 0 ? round((int) $row['bounces'] / (int) $row['visits'], 4) : 0.0,
+                'bounce_rate' => (int) $row['visits'] > 0 ? round((int) $row['bounces'] / (int) $row['visits'], 4) : null, // no visits recorded, such as imported history
                 'fetch_type' => in_array((string) $row['name'], (array) config('stats.ai_user_fetchers', []), true) ? 'user' : 'crawler',
                 'path', 'title', 'page_type', 'content_group', 'from_path', 'to_path', 'source_type', 'source', 'utm_medium',
                 'utm_campaign', 'utm_content', 'utm_term', 'value', 'target', 'label', 'name', 'kind', 'locale' => isset($row[$column]) ? (string) $row[$column] : null,
@@ -400,7 +406,7 @@ class StatsQuery
     private function totals(Site $site, CarbonImmutable $from, CarbonImmutable $to): array
     {
         $row = $this->range('daily_totals', $site, $from, $to)
-            ->selectRaw('SUM(visitors) AS visitors, SUM(visits) AS visits, SUM(pageviews) AS pageviews, SUM(bounces) AS bounces, SUM(duration_seconds) AS duration_seconds, SUM(events) AS events, SUM(outbound) AS outbound')
+            ->selectRaw('SUM(visitors) AS visitors, SUM(visits) AS visits, SUM(pageviews) AS pageviews, SUM(bounces) AS bounces, SUM(duration_seconds) AS duration_seconds, SUM(events) AS events, SUM(outbound) AS outbound, SUM(CASE WHEN visits > 0 THEN pageviews ELSE 0 END) AS visit_pageviews')
             ->first();
         $pages = $this->range('daily_pages', $site, $from, $to)->where('pageviews', '>', 0)->distinct()->count('path_hash');
         $engaged = $this->range('daily_pages', $site, $from, $to)->selectRaw('SUM(engaged_views) AS v, SUM(engaged_seconds) AS s')->first();
@@ -414,7 +420,8 @@ class StatsQuery
             'visits' => $visits,
             'pageviews' => $pageviews,
             'pages' => $pages,
-            'views_per_visit' => $visits > 0 ? round($pageviews / $visits, 2) : 0.0,
+            // Days without visit data (such as imported history) do not count towards views per visit.
+            'views_per_visit' => $visits > 0 ? round((int) ($row->visit_pageviews ?? 0) / $visits, 2) : 0.0,
             'bounce_rate' => $visits > 0 ? round((int) ($row->bounces ?? 0) / $visits, 4) : 0.0,
             'avg_duration_seconds' => intdiv((int) ($row->duration_seconds ?? 0), max($visits, 1)),
             'avg_page_seconds' => $engagedViews > 0 ? intdiv((int) ($engaged->s ?? 0), $engagedViews) : 0,

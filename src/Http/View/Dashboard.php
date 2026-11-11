@@ -206,6 +206,9 @@ final class Dashboard
     /** Display text of any report cell: percentages, durations, numbers, or the translated text. */
     public static function cell(string $report, string $column, int|float|string|null $value): string
     {
+        if ($value === null && ! self::isText($column)) {
+            return '–'; // a rate without its base, such as the bounce rate of days without visit data
+        }
         if ($column === 'bounce_rate' || self::isRate($column)) {
             return Format::percent((float) $value);
         }

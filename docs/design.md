@@ -1,4 +1,4 @@
-# N2N Stats (n2ns/laravel-stats) design
+# N2N Stats (n2ns/laravel-site-stats) design
 
 N2N Stats is an open-source, cookieless web analytics package for Laravel, for a single site or for many: installed in a site's own Laravel app it counts that site in its own database and admin; one installation can also count any number of other websites. Only daily aggregates are kept. This document records how the package works and why. Where it and the code disagree, the code is right.
 
@@ -6,7 +6,7 @@ N2N Stats is an open-source, cookieless web analytics package for Laravel, for a
 
 | Topic | Design |
 | --- | --- |
-| Form | Laravel package `n2ns/laravel-stats`, product name N2N Stats, Apache-2.0 |
+| Form | Laravel package `n2ns/laravel-site-stats`, product name N2N Stats, Apache-2.0 |
 | Data | Page views (with page title, page type and content group), sources, entry and exit pages, landing pages per source, page-to-page moves, outbound clicks, downloads, custom events (name, label, target), AI referrals and AI fetches, unique visitors, the site language version of each page. Conversions, revenue and funnels are not part of this version |
 | Unique visitors | No cookies: `sha256(daily salt + site public id + IP + User-Agent)`. The salt is random per day and deleted within 48 hours after the day ends |
 | User interface | A built-in dashboard in English and Simplified Chinese (access decided by the host app's `viewStats` gate) that can be turned off, optional Filament pages built from native Filament components (statistics page, Sites resource, widgets), a read-only JSON API, an optional public counts endpoint |
@@ -76,7 +76,7 @@ The table prefix is configurable (default `stats_`). Every daily table is bucket
 ### 4.3 Daily aggregates (kept forever, or for `retention_days`)
 
 - `stats_daily_totals`: site_id, date, pageviews, visitors, visits, bounces, duration_seconds (sum over ended visits), events (outbound clicks, downloads and custom events), outbound. Unique (site_id, date).
-- `stats_daily_pages`: site_id, date, path (≤ 512), path_hash, pageviews, visitors, entries, exits, entry_pageviews (page views of the visits that entered here, added when they end), entry_outbound and entry_events (outbound clicks and other events of the visits that entered here), engaged_views, engaged_seconds, time_10/30/60/180, scroll_25/50/75/100 (time on page and scroll depth, 5.3), title, page_type, content_group (the latest values the page reported). Unique (site_id, date, path_hash).
+- `stats_daily_pages`: site_id, date, path (≤ 512), path_hash, pageviews, visitors, entries, entry_visitors (visitors who entered here), exits, entry_pageviews (page views of the visits that entered here, added when they end), entry_outbound and entry_events (outbound clicks and other events of the visits that entered here), engaged_views, engaged_seconds, time_10/30/60/180, scroll_25/50/75/100 (time on page and scroll depth, 5.3), title, page_type, content_group (the latest values the page reported). Unique (site_id, date, path_hash).
 - `stats_daily_sources`: site_id, date, source_key, source_type (utm, search, social, ai, referral, direct), source (referrer host without `www.`, or utm_source), utm_medium, utm_campaign, utm_content, utm_term, visits, visitors, pageviews, bounces, outbound, events. Unique (site_id, date, source_key). A visit's page views, outbound clicks and events belong to the source of its entry.
 - `stats_daily_entries`: site_id, date, path, path_hash, source_key, source_type, source, utm_campaign, visits, visitors. Unique (site_id, date, path_hash, source_key). Landing pages per source.
 - `stats_daily_transitions`: site_id, date, from_path, from_hash, to_path, to_hash, count, visitors. Unique (site_id, date, from_hash, to_hash). Moves from one page to another within a visit.
@@ -121,7 +121,7 @@ Per site, day and table, at most `max_new_rows_per_day` (default 5000) new aggre
 
 - **pageview**:
   - Find the visitor's latest visit on the site: if its `last_seen_at` is within 30 minutes, continue it, otherwise open a new visit. Finding or opening the visit is serialised per visitor with a Laravel cache lock, so two parallel first page views cannot open two visits.
-  - New visit: classify the source (5.4); `stats_daily_totals.visits` +1, `stats_daily_sources.visits` +1, entry page `entries` +1, the landing-page row (`stats_daily_entries`) `visits` +1, each dimension (country, device, browser, OS, browser language, and the site language of the entry page) `visits` +1 with its visitors deduplicated through `stats_uniques`.
+  - New visit: classify the source (5.4); `stats_daily_totals.visits` +1, `stats_daily_sources.visits` +1, entry page `entries` +1 (and `entry_visitors` once per visitor), the landing-page row (`stats_daily_entries`) `visits` +1, each dimension (country, device, browser, OS, browser language, and the site language of the entry page) `visits` +1 with its visitors deduplicated through `stats_uniques`.
   - Every page view: `pageviews` +1 on totals, the page row (title, type and group overwritten when the page sent them) and the visit's source row; the site language row `pageviews` +1; when the visit was already on another page, the move from that page to this one +1; visitors deduplicated through `stats_uniques`; the visit's `pageviews`, `last_seen_at` and `exit_path_hash` are updated.
 - **engagement**: on the page's row, `engaged_seconds` + (new total − reported total, each capped at 1800 s); `engaged_views` +1 when nothing was reported before (`e0` and `sp0` are 0); `time_10/30/60/180` and `scroll_25/50/75/100` +1 for each threshold first reached in this report. The open visit's `last_seen_at` is updated, so visit duration includes the time on the last page. Not counted as an event.
 - **outbound / download / event**: `stats_daily_events.count` +1 with visitors deduplicated; `totals.events` +1 (and `totals.outbound` +1 for outbound clicks). Events do not open a visit; when one is open they update its `last_seen_at` and are credited to it: an outbound click to `outbound` of the visit's source row and `entry_outbound` of its entry page, a download or custom event to `events` and `entry_events`. Outbound and download rows have an empty name (only custom events and AI fetches have one). AI fetches are not counted in `totals.events`.
@@ -131,7 +131,8 @@ Per site, day and table, at most `max_new_rows_per_day` (default 5000) new aggre
 
 ### 5.4 Source classification
 
-- `utm_source` present → `utm` (with medium, campaign, content and term).
+- `utm_source` that is an AI host (with or without `www.`) and no `utm_medium` or `utm_campaign` → `ai`: AI assistants such as ChatGPT tag the links they show with `utm_source=<their host>` only.
+- Other `utm_source` present → `utm` (with medium, campaign, content and term).
 - No referrer → the first matching click id, otherwise `direct`.
 - Referrer present, in this order: the site's own hosts (not a new source, counted as `direct`) → AI → search → social → click id → `referral`.
 - AI comes before search, otherwise `gemini.google.com` would be classified as search by `google.`. AI hosts match exactly (with or without `www.`). Search and social entries match on domain label boundaries, not substrings: `google.` matches `google.com` and `www.google.co.uk`; `t.co` matches `t.co` and its subdomains but not `microsoft.com`.
@@ -213,4 +214,4 @@ No cookies and no browser storage; IP addresses and User-Agent strings are not s
 
 ## 12. Releases
 
-Releases are tagged on GitHub (`n2ns/laravel-stats`) and published to Packagist.
+Releases are tagged on GitHub (`n2ns/laravel-site-stats`) and published to Packagist.

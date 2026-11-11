@@ -5,7 +5,7 @@ Laravel app to count that site in its own database and admin, or run one Laravel
 number of websites. It collects page views, sources, outbound clicks, downloads, custom events, time
 on page and AI fetches, and stores **only daily aggregates**.
 
-`n2ns/laravel-stats` is made by [Datafrog LLC](https://datafrog.io) as part of
+`n2ns/laravel-site-stats` is made by [Datafrog LLC](https://datafrog.io) as part of
 [N2NS Lab](https://n2ns.com).
 
 ## Why
@@ -46,7 +46,7 @@ See [PRIVACY.md](PRIVACY.md) for the full list and a paragraph you can adapt for
 ## Installation
 
 ```bash
-composer require n2ns/laravel-stats
+composer require n2ns/laravel-site-stats
 php artisan stats:install
 ```
 
@@ -342,7 +342,8 @@ respects reduced motion.
 - **AI:** visits and visitors referred by AI assistants and AI fetches with a daily chart, AI referrals,
   the pages AI assistants send visitors to, AI fetchers (crawler or user-triggered, with the number of
   pages fetched) and the pages they fetched.
-- Each report is a card with its main column, main figure and each row's share: the top 10 rows,
+- Each report is a card with its main column, main figure and each row's share (reports of visits use
+  their visitors, which imported days without visit data also have; a rate without visits shows –): the top 10 rows,
   with "show all" for the top 50. Reports with more columns have an "All columns" view with the full
   table. Tables can be sorted by any column and exported as CSV (up to 500 rows); source types,
   countries, devices, site languages and page types also have a donut chart.
@@ -459,7 +460,7 @@ Publish the file with `php artisan vendor:publish --tag=stats-config`. Main opti
 | `bot_user_agents` | | | User-Agent substrings that are dropped as bots |
 | `ai_fetchers` | | | User-Agent substrings counted as AI fetchers |
 | `ai_user_fetchers` | | | AI fetchers that fetch on a person's request (the others are crawlers) |
-| `search_hosts`, `social_hosts`, `ai_hosts` | | | Referrer hosts that classify a source as search, social or AI |
+| `search_hosts`, `social_hosts`, `ai_hosts` | | | Referrer hosts that classify a source as search, social or AI; `ai_hosts` also match a `utm_source` given without medium and campaign |
 | `click_ids` | | | Click-id query parameters (`gclid`, `fbclid`, …) and the source they imply |
 | `download_extensions` | | | File extensions counted as downloads |
 | `client.endpoint`, `client.site`, `client.key` | `STATS_CLIENT_*` | | Client mode: host URL, site public id and server key |
@@ -473,7 +474,7 @@ All tables use the `table_prefix`. Daily tables are bucketed by the site's timez
 | `stats_sites` | Name, public id, allowed domains, timezone, site languages, excluded paths, public counts, hash of the server key | Until deleted |
 | `stats_api_tokens` | Name, hash of the token, allowed sites, last use | Until revoked |
 | `stats_daily_totals` | Page views, visitors, visits, bounces, visit duration, events, outbound clicks per day | `retention_days` |
-| `stats_daily_pages` | Per path: page views, visitors, entries, exits, the page views, outbound clicks and events of visits that entered there; time on page and scroll depth; title, page type, content group | `retention_days` |
+| `stats_daily_pages` | Per path: page views, visitors, entries, visitors who entered there, exits, the page views, outbound clicks and events of visits that entered there; time on page and scroll depth; title, page type, content group | `retention_days` |
 | `stats_daily_sources` | Per source (type, host or UTM source, medium, campaign, content, term): visits, visitors, page views, bounces, outbound clicks, events | `retention_days` |
 | `stats_daily_entries` | Per entry page and source: visits, visitors | `retention_days` |
 | `stats_daily_transitions` | Per move from one page to another: count, visitors | `retention_days` |
@@ -495,9 +496,11 @@ All tables use the `table_prefix`. Daily tables are bucketed by the site's timez
   After 30 minutes of inactivity the next page view starts a new visit. When the daily salt
   changes, the visitor hash changes too, so the next page view also starts a new visit.
 - **Source:** decided when a visit starts, from UTM parameters, the referrer and click ids
-  (in that order: UTM, AI, search, social, click id, other referrer, direct). Referrals from the
-  site itself count as direct.
-- **Bounce:** a visit that ended with exactly one page view. Bounce rate = bounces / visits.
+  (in that order: an AI assistant's own `utm_source` alone, such as ChatGPT's `utm_source=chatgpt.com`;
+  UTM; AI, search, social, click id, other referrer; direct). Referrals from the site itself count as
+  direct.
+- **Bounce:** a visit that ended with exactly one page view. Bounce rate = bounces / visits; a source
+  without visits (such as imported history) has no bounce rate (`null` in the API).
 - **Events:** outbound clicks, downloads and custom events (AI fetches are counted separately). An
   event is credited to the source and the entry page of the visit it happens in.
 - **Page move:** two consecutive page views of one visit on different paths.

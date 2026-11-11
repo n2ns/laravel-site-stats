@@ -198,11 +198,17 @@ it('draws accessible donuts with a text legend for the share reports', function 
     $html = $this->get(route('stats.dashboard.site', ['publicId' => $site->public_id, 'range' => '7d']))->assertOk()->getContent();
 
     expect(substr_count($html, '<svg class="donut"'))->toBe(count(Dashboard::DONUTS))
-        ->and($html)->toContain('aria-label="Source types by Visits: share of each item; the legend lists the values."')
-        ->toContain('aria-label="Devices by Visits: share of each item; the legend lists the values."')
-        ->toContain('<span class="name">Desktop</span> 75 (75.0%)')
-        ->toContain('<span class="name">Mobile</span> 25 (25.0%)')
-        ->toContain('<span class="name">Search</span> 30 (60.0%)');
+        ->and($html)->toContain('aria-label="Source types by Visitors: share of each item; the legend lists the values."')
+        ->toContain('aria-label="Devices by Visitors: share of each item; the legend lists the values."')
+        ->toContain('<span class="name">Desktop</span> 60 (75.0%)')
+        ->toContain('<span class="name">Mobile</span> 20 (25.0%)')
+        ->toContain('<span class="name">Search</span> 28 (59.6%)');
+});
+
+it('shows a rate without its base as a dash', function () {
+    expect(Dashboard::cell('sources', 'bounce_rate', null))->toBe('–')
+        ->and(Dashboard::cell('sources', 'bounce_rate', 0.25))->toBe('25.0%')
+        ->and(Dashboard::cell('sources', 'source', null))->toBe('–');
 });
 
 it('puts the rest of the total into "Other" in a donut', function () {
@@ -447,7 +453,7 @@ it('puts every column of wide reports into a details view', function () {
     expect(Dashboard::layout('engagement'))->toBe(['label' => 'path', 'sub' => ['title'], 'metric' => 'engaged_views', 'details' => true])
         ->and(Dashboard::layout('exits')['details'])->toBeFalse()
         ->and(Dashboard::layout('ai_fetched_pages'))->toBe(['label' => 'name', 'sub' => ['path'], 'metric' => 'count', 'details' => false])
-        ->and(Dashboard::layout('countries'))->toBe(['label' => 'value', 'sub' => [], 'metric' => 'visits', 'details' => true]);
+        ->and(Dashboard::layout('countries'))->toBe(['label' => 'value', 'sub' => [], 'metric' => 'visitors', 'details' => true]);
 });
 
 it('splits the KPIs into primary and secondary metrics with tones and sparklines', function () {

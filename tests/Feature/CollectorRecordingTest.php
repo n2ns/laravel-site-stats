@@ -29,7 +29,7 @@ function recPageRow(string $path): array
 {
     $row = DB::table('stats_daily_pages')->where('path', $path)->first();
 
-    return array_map('intval', array_intersect_key((array) $row, array_flip(['pageviews', 'visitors', 'entries', 'exits'])));
+    return array_map('intval', array_intersect_key((array) $row, array_flip(['pageviews', 'visitors', 'entries', 'exits', 'entry_visitors'])));
 }
 
 function recCloseVisits(): int
@@ -50,8 +50,8 @@ it('continues a visit within the timeout and dedupes visitors', function () {
     recHit($this->site, 'pageview', 'https://example.com/a', ['r' => 'https://example.com/b']);
 
     expect(recTotals())->toMatchArray(['pageviews' => 3, 'visitors' => 1, 'visits' => 1])
-        ->and(recPageRow('/a'))->toBe(['pageviews' => 2, 'visitors' => 1, 'entries' => 1, 'exits' => 0])
-        ->and(recPageRow('/b'))->toBe(['pageviews' => 1, 'visitors' => 1, 'entries' => 0, 'exits' => 0]);
+        ->and(recPageRow('/a'))->toBe(['pageviews' => 2, 'visitors' => 1, 'entries' => 1, 'exits' => 0, 'entry_visitors' => 1])
+        ->and(recPageRow('/b'))->toBe(['pageviews' => 1, 'visitors' => 1, 'entries' => 0, 'exits' => 0, 'entry_visitors' => 0]);
 
     $sources = DB::table('stats_daily_sources')->get();
     expect($sources)->toHaveCount(1)
@@ -73,7 +73,7 @@ it('starts a new visit after 30 minutes of inactivity', function () {
     recHit($this->site, 'pageview', 'https://example.com/a', ['r' => 'https://chatgpt.com/']);
 
     expect(recTotals())->toMatchArray(['pageviews' => 3, 'visitors' => 1, 'visits' => 2])
-        ->and(recPageRow('/a'))->toMatchArray(['entries' => 2, 'visitors' => 1])
+        ->and(recPageRow('/a'))->toMatchArray(['entries' => 2, 'visitors' => 1, 'entry_visitors' => 1]) // one visitor entering twice
         ->and(DB::table('stats_daily_sources')->pluck('visits', 'source_type')->map(fn ($v) => (int) $v)->all())->toBe(['direct' => 1, 'ai' => 1]);
 
     $dims = DB::table('stats_daily_dimensions')->get();
