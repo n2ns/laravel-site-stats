@@ -6,6 +6,18 @@ All notable changes to N2N Stats are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-11-12
+
+### Changed
+
+- Sites are managed from a Site settings button at the top right of the statistics page, in the dashboard and in
+  Filament; the Filament Sites resource is no longer a separate item of the panel navigation.
+
+### Fixed
+
+- `php artisan view:cache` (and `optimize`) no longer fails on apps without Filament: the package's Filament views
+  are registered only where Filament is installed.
+
 ## [0.1.5] - 2026-11-11
 
 ### Changed
@@ -144,6 +156,7 @@ All notable changes to N2N Stats are listed here. The format follows
 - Commands `stats:install`, `stats:site`, `stats:token` and `stats:maintain` (scheduled every five
   minutes); configurable retention of aggregates.
 
+[0.1.6]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.6
 [0.1.5]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.5
 [0.1.4]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.4
 [0.1.3]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.3

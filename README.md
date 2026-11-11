@@ -150,7 +150,7 @@ have to be Laravel apps. Their visitors' browsers send the data directly to this
 ## Site settings
 
 Each counted website, in either setup, is a site with these settings (`stats:site create` and
-`update`, the dashboard's Sites page or the Filament Sites resource):
+`update`, or the Site settings page opened from the top right of the dashboard or of the Filament statistics page):
 
 - **Domains** are the hostnames allowed to send data for the site. `example.com` also accepts
   `www.example.com`; `*.example.com` accepts `example.com` and every subdomain. Events from other
@@ -375,7 +375,8 @@ Filament sections) so they follow your panel's colours and dark mode:
   the same charts as the dashboard, as sortable, searchable, paginated tables with CSV export and
   doughnut charts;
 - a Sites resource to create, edit and delete sites (deleting removes their statistics too), copy
-  the embed code and generate a server key for client mode; leave it out with
+  the embed code and generate a server key for client mode, opened from the Site settings button at
+  the top right of the statistics page rather than from the panel navigation; leave it out with
   `->sitesResource(false)`;
 - widgets for your panel's dashboard with each site's visitors and page views for today and the last
   7 days (with the change over complete days) and the top 5 sources of the last 7 days.

@@ -19,7 +19,7 @@ class TabChart extends Widget
     // Loaded when its tab is shown, so hidden tabs cost nothing on page load.
     protected static ?bool $isLazyLoaded = true;
 
-    protected string $view = 'stats::filament.tab-chart';
+    protected string $view = 'stats-filament::tab-chart';
 
     #[Locked]
     public string $chart = 'time_on_page';

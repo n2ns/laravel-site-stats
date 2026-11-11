@@ -87,6 +87,7 @@ return [
     'sites' => [
         'title' => 'Sites',
         'model' => 'site',
+        'open_settings' => 'Site settings',
         'create' => 'Create site',
         'open_statistics' => 'Statistics',
         'embed' => 'Embed code',

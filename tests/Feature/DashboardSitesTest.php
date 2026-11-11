@@ -195,5 +195,5 @@ it('lays out each site as a card with a copyable snippet and labelled fields wit
         ->assertSee('<label for="domains-new">Domains</label>', false)
         ->assertSee('aria-describedby="domains-help-new"', false)
         ->assertSee('<p class="help" id="domains-help-new">Domains, one per line', false)
-        ->assertSee('<a href="'.route('stats.sites.index').'" aria-current="page">Sites</a>', false);
+        ->assertSee('<a href="'.route('stats.sites.index').'" aria-current="page">Site settings</a>', false);
 });

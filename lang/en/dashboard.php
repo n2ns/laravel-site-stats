@@ -2,7 +2,7 @@
 
 return [
     'brand' => 'N2N Stats',
-    'nav' => ['main' => 'Main', 'dashboard' => 'Dashboard', 'sites' => 'Sites'],
+    'nav' => ['main' => 'Main', 'dashboard' => 'Dashboard', 'sites' => 'Site settings'],
     'footer' => 'Figures are for reference only. N2N Stats sets no cookies and uses no browser storage; it does not store IP addresses or User-Agents. Visitors are counted once per day with a daily random salt, so the same person is not recognised across days or sites: “visitors” over a range is the sum of daily unique visitors. Bounce rate and visit duration count finished visits.',
 
     'toolbar' => 'Site and date range',

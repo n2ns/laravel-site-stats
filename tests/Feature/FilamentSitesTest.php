@@ -208,3 +208,14 @@ it('renders the resource in Simplified Chinese', function () {
     $this->get('/admin/stats-sites/'.$site->public_id)->assertOk()->assertSee('嵌入代码')->assertSee('生成服务器密钥')->assertDontSee('stats::');
     $this->get('/admin/stats-sites/create')->assertOk()->assertSee('排除的路径')->assertDontSee('stats::');
 });
+
+it('opens the sites from a Site settings button on the statistics page instead of the navigation', function () {
+    FilamentPanel::allowStats();
+    S::site('Alpha');
+
+    expect(SiteResource::shouldRegisterNavigation())->toBeFalse();
+    Livewire::test(StatsDashboard::class)
+        ->assertActionVisible('siteSettings')
+        ->assertActionHasLabel('siteSettings', 'Site settings')
+        ->assertActionHasUrl('siteSettings', SiteResource::getUrl('index'));
+});

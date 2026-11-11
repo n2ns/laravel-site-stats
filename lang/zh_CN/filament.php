@@ -87,6 +87,7 @@ return [
     'sites' => [
         'title' => '站点',
         'model' => '站点',
+        'open_settings' => '站点配置',
         'create' => '创建站点',
         'open_statistics' => '查看统计',
         'embed' => '嵌入代码',

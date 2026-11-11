@@ -75,6 +75,12 @@ class SiteResource extends Resource
         return (string) __('stats::filament.sites.title');
     }
 
+    /** Opened from the Site settings button of the statistics page, not from the panel navigation. */
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function form(Schema $schema): Schema
     {
         $message = fn (string $key, array $replace = []): string => (string) __('stats::filament.validation.'.$key, $replace);

@@ -2,6 +2,7 @@
 
 namespace N2ns\Stats;
 
+use Filament\Widgets\Widget;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Http\Request;
@@ -39,6 +40,11 @@ class StatsServiceProvider extends ServiceProvider
 
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'stats');
+        // Views built from Filament's components: `view:cache` compiles every registered view, so they are registered only
+        // where Filament is installed.
+        if (class_exists(Widget::class)) {
+            $this->loadViewsFrom(__DIR__.'/../resources/views-filament', 'stats-filament');
+        }
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'stats');
 
         // Hosts grant access with Gate::define('viewStats', ...); denied by default.

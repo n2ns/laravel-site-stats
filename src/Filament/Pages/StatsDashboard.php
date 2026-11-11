@@ -113,6 +113,19 @@ class StatsDashboard extends Page
         ]);
     }
 
+    /** @return array<Action> */
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('siteSettings')
+                ->label(__('stats::filament.sites.open_settings'))
+                ->icon(Heroicon::OutlinedCog6Tooth)
+                ->color('gray')
+                ->url(fn (): string => SiteResource::getUrl('index'))
+                ->visible(fn (): bool => StatsPlugin::get()->hasSitesResource() && SiteResource::canViewAny()),
+        ];
+    }
+
     public function content(Schema $schema): Schema
     {
         return $schema->components(fn (): array => $this->components());
