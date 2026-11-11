@@ -7,6 +7,10 @@
 <h1 class="sr-only">{{ $site->name }}</h1>
 <section aria-label="{{ __('stats::dashboard.toolbar') }}">
 <div class="toolbar">
+@if ($sites->count() === 1)
+{{-- A single site (the stats of the app itself): its name, no switcher. --}}
+<div class="site-switch"><span class="site-name">{{ $site->name }}</span></div>
+@else
 <form method="get" action="{{ $siteAction }}" class="site-switch" data-autosubmit>
 <label>{{ __('stats::dashboard.site') }}
 {{-- Browsers size a select by its options in normal weight; the bold title needs room for the longest name. --}}
@@ -19,6 +23,7 @@
 @foreach ($query as $k => $v)<input type="hidden" name="{{ $k }}" value="{{ $v }}">@endforeach
 <noscript><button type="submit">{{ __('stats::dashboard.go') }}</button></noscript>
 </form>
+@endif
 <form method="get" action="{{ $rangeAction }}" class="range-form" id="range-form">
 @foreach ($rangeHidden as $k => $v)<input type="hidden" name="{{ $k }}" value="{{ $v }}">@endforeach
 <label>{{ __('stats::dashboard.range') }}

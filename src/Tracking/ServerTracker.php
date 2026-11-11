@@ -79,11 +79,7 @@ class ServerTracker
     /** @param  array<string, string|null>  $fields */
     private function record(Request $request, string $kind, array $fields, string $userAgent): void
     {
-        // A pinned site does not depend on the Host header (see TrackAiFetches).
-        $pinned = config('stats.host_site');
-        $site = is_string($pinned) && $pinned !== ''
-            ? Site::query()->where('public_id', $pinned)->first()
-            : Site::query()->get()->first(fn (Site $site): bool => $site->allowsHost($request->getHost()));
+        $site = Site::forHost($request->getHost());
         $payload = $site === null ? null : Payload::fromArray(self::payloadData($site->public_id, $kind, $fields));
         if ($payload === null) {
             return;

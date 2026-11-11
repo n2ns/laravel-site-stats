@@ -58,12 +58,7 @@ class TrackAiFetches
 
     private function record(string $host, string $fetcher, string $path): void
     {
-        // A pinned site does not depend on the Host header, which a client controls when the web server
-        // accepts any host name.
-        $pinned = config('stats.host_site');
-        $site = is_string($pinned) && $pinned !== ''
-            ? Site::query()->where('public_id', $pinned)->first()
-            : Site::query()->get()->first(fn (Site $site): bool => $site->allowsHost($host));
+        $site = Site::forHost($host);
         if ($site === null) {
             return;
         }

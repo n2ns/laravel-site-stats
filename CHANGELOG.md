@@ -6,6 +6,19 @@ All notable changes to N2N Stats are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-11
+
+### Added
+
+- Single-site setup on equal terms with the multi-site one: `stats:install --site= --domain=` creates
+  the app's own site, the `@statsScript` Blade directive prints its script tag (also in client mode,
+  pointing to the host), and the dashboards hide the site switcher when there is one site.
+
+### Changed
+
+- When several sites' domains match the request host (and `host_site` is not set), server-side
+  counting uses the oldest of them.
+
 ## [0.1.1] - 2026-11-11
 
 ### Added
@@ -64,5 +77,6 @@ All notable changes to N2N Stats are listed here. The format follows
 - Commands `stats:install`, `stats:site`, `stats:token` and `stats:maintain` (scheduled every five
   minutes); configurable retention of aggregates.
 
+[0.1.2]: https://github.com/n2ns/laravel-stats/releases/tag/v0.1.2
 [0.1.1]: https://github.com/n2ns/laravel-stats/releases/tag/v0.1.1
 [0.1.0]: https://github.com/n2ns/laravel-stats/releases/tag/v0.1.0

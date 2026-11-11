@@ -92,7 +92,8 @@ class StatsDashboard extends Page
                     ->label(__('stats::filament.site'))
                     ->options(fn (): array => Selection::sites()->pluck('name', 'public_id')->all())
                     ->default(fn (): ?string => Selection::sites()->first()?->public_id)
-                    ->selectablePlaceholder(false),
+                    ->selectablePlaceholder(false)
+                    ->visible(fn (): bool => Selection::sites()->count() > 1), // a single site needs no switcher
                 Select::make('range')
                     ->label(__('stats::filament.range'))
                     ->options($ranges)

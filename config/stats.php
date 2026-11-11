@@ -28,8 +28,9 @@ return [
     'dashboard_middleware' => ['web'],
 
     /*
-    | Host mode: public id of the site the TrackAiFetches and TrackPageviews middleware and Stats::event() count for. When null,
-    | the site is found by the request's Host header (only safe when the web server rejects unknown hosts).
+    | Host mode: public id of the app's own site, which the TrackAiFetches and TrackPageviews middleware and Stats::event()
+    | count for and @statsScript prints (only on the site's own domains). When null, the site is found by the request's
+    | Host header (only safe when the web server rejects unknown hosts; the oldest site when several match).
     */
     'host_site' => env('STATS_HOST_SITE'),
 

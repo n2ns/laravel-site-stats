@@ -115,6 +115,21 @@ class Site extends Model
         return false;
     }
 
+    /**
+     * The site that the host app's own pages belong to: the one set in `host_site`, otherwise the site whose domains
+     * allow $host (only safe when the web server rejects unknown host names; the oldest one when several do).
+     * Null when there is none.
+     */
+    public static function forHost(string $host): ?self
+    {
+        $pinned = config('stats.host_site');
+        if (is_string($pinned) && $pinned !== '') {
+            return self::query()->where('public_id', $pinned)->first();
+        }
+
+        return self::query()->orderBy('id')->get()->first(fn (self $site): bool => $site->allowsHost($host));
+    }
+
     /** A lower-case hostname with at least two labels, optionally starting with "*."; not an IP address. */
     public static function isValidDomain(string $domain): bool
     {

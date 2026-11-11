@@ -5,6 +5,7 @@ namespace N2ns\Stats;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
@@ -28,6 +29,9 @@ class StatsServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([InstallCommand::class, SiteCommand::class, TokenCommand::class, MaintainCommand::class]);
         }
+
+        // @statsScript or @statsScript(['data-pageviews' => 'off']) in the layout of the app's own pages.
+        Blade::directive('statsScript', fn (string $expression): string => '<?php echo \\N2ns\\Stats\\Stats::script('.$expression.'); ?>');
 
         if (config('stats.mode') !== 'host') {
             return;

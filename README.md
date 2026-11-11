@@ -1,8 +1,9 @@
 # N2N Stats
 
-Cookieless, multi-site web analytics for Laravel. One Laravel app collects page views, sources,
-outbound clicks, downloads, custom events and AI fetches for any number of websites, and stores
-**only daily aggregates** in your own database.
+Cookieless web analytics for Laravel, for a single site or for many. Install it in a site's own
+Laravel app to count that site in its own database and admin, or run one Laravel app that counts any
+number of websites. It collects page views, sources, outbound clicks, downloads, custom events, time
+on page and AI fetches, and stores **only daily aggregates**.
 
 `n2ns/laravel-stats` is made by [Datafrog LLC](https://datafrog.io) as part of
 [N2NS Lab](https://n2ns.com).
@@ -16,8 +17,9 @@ outbound clicks, downloads, custom events and AI fetches for any number of websi
 - **No personal data kept.** IP addresses and User-Agent strings are used for a moment to compute a
   hash and are never stored. The hash uses a random salt that changes every day and is deleted
   within 48 hours after the day ends, so a visitor cannot be followed across days or across sites.
-- **Multi-site.** One installation serves many websites with one line of script each; they do not
-  have to be Laravel apps.
+- **Single site or many.** Count a Laravel app's own pages, with the data in its own database and the
+  statistics in its own admin; or let one installation count many websites with one line of script
+  each (they do not have to be Laravel apps). Both work in the same installation.
 - **Self-hosted, no third parties.** Data stays on your server. Country comes from your CDN's
   request header; no IP address is ever sent to a geolocation service.
 
@@ -49,71 +51,106 @@ php artisan stats:install
 ```
 
 `stats:install` publishes `config/stats.php`, runs the migrations (pass `--force` in production)
-and prints the next steps below.
+and prints the next steps. The app that stores the data runs in **host mode** (the default,
+`STATS_MODE=host`). Then, in every setup:
 
-## Host setup
+1. **Allow access to the statistics.** They are guarded by the `viewStats` gate, which denies everyone
+   until you define it, for example in `AppServiceProvider::boot()`:
 
-The app that stores the data runs in **host mode** (the default, `STATS_MODE=host`).
+   ```php
+   use Illuminate\Support\Facades\Gate;
 
-### 1. Choose where the collector lives
+   Gate::define('viewStats', fn ($user) => $user->is_admin);
+   ```
 
-The tracking script, the collector and the read API can run on their own domain, for example
-`stats.example.com`, while the dashboard stays on your app's normal domain:
+2. **Run the scheduler.** The package schedules `stats:maintain` every five minutes. It ends visits
+   that have been idle for 30 minutes, deletes expired salts and per-day deduplication data, and
+   removes aggregates older than `retention_days`:
 
-```dotenv
-STATS_COLLECTOR_DOMAIN=stats.example.com
-```
+   ```cron
+   * * * * * cd /path-to-your-app && php artisan schedule:run >> /dev/null 2>&1
+   ```
 
-Leave it empty to serve them on the app's own domain under `STATS_COLLECTOR_PATH` (empty by default,
-so the script is at `/js/stats.js`).
+3. **Country and visitor IP.** The country is read from the `CF-IPCountry` request header, so put the
+   site (or the collector domain) behind Cloudflare with the proxy enabled, or another CDN that sends
+   this header; without it every visit has the country `unknown`. Behind a proxy or CDN, configure
+   Laravel's trusted proxies so that `$request->ip()` is the visitor's address: it is only used for the
+   daily hash and rate limits, but if all requests seem to come from the proxy, all visitors become one.
 
-For a separate stats subdomain:
+Then set up one or both of the following.
 
-- **DNS:** add a record for `stats.example.com` pointing to the server of your app.
-- **Web server:** point the subdomain at the same Laravel app, e.g. an Nginx `server` block with
-  `server_name stats.example.com;` and the same `root` and PHP handling as your app, plus a TLS
-  certificate for the name.
-- **Country data:** the country is read from the `CF-IPCountry` request header. Put the domain behind
-  Cloudflare with the proxy enabled (or another CDN that sends this header); without it every
-  visit is counted with the country `unknown`.
-- **Real client IP:** behind a proxy or CDN, configure Laravel's trusted proxies so that
-  `$request->ip()` is the visitor's address. The address is only used for the daily hash and rate
-  limits, but if all requests appear to come from the proxy, all visitors collapse into one.
+## Single site: count the app itself
 
-### 2. Allow access to the dashboard
+The site is the Laravel app the package is installed in. The script and the collector are served on
+the app's own domain, the data is in its own database, and the statistics are in its own dashboard
+or Filament admin; nothing is sent to another server.
 
-The dashboard is guarded by the `viewStats` gate, which denies everyone until you define it, for
-example in `AppServiceProvider::boot()`:
+1. Create the site while installing (or later with `stats:site create`):
 
-```php
-use Illuminate\Support\Facades\Gate;
+   ```bash
+   php artisan stats:install --site="Example" --domain=example.com    # add --force in production
+   ```
 
-Gate::define('viewStats', fn ($user) => $user->is_admin);
-```
+2. Add the script to the `<head>` of your layout. `@statsScript` prints the tag of the site whose
+   domains match the request (or of `STATS_HOST_SITE`, on its own domains); it prints nothing when
+   there is no such site:
 
-### 3. Run the scheduler
+   ```blade
+   @statsScript
+   ```
 
-The package schedules `stats:maintain` every five minutes. It ends visits that have been idle for
-30 minutes, deletes expired salts and per-day deduplication data, and removes aggregates older than
-`retention_days`. Make sure Laravel's scheduler runs:
+3. Optionally count on the server as well (see [Counting on the server](#counting-on-the-server)):
+   `TrackAiFetches` for AI fetchers, and `TrackPageviews` for page views without JavaScript and only
+   for real pages. With `TrackPageviews`, keep the script for its events only:
 
-```cron
-* * * * * cd /path-to-your-app && php artisan schedule:run >> /dev/null 2>&1
-```
+   ```blade
+   @statsScript(['data-pageviews' => 'off'])
+   ```
 
-## Adding sites
+4. Look at the statistics at `/stats`, or in your Filament admin with the [plugin](#filament) and
+   `STATS_DASHBOARD_ENABLED=false`. With a single site there is no site switcher.
 
-```bash
-php artisan stats:site create --name="Example" --domain=example.com --domain=*.example.org --timezone=Europe/Berlin
-```
+## Multiple sites: one app counts many websites
 
-The command prints the site's public id and its snippet. With `collector_domain` set, the snippet
-points to `https://` on that domain; otherwise its URL is built from `APP_URL`, so set `APP_URL` to the
-app's public URL first. Add the snippet to the `<head>` of every page:
+One Laravel app stores the statistics of other websites, which may be on other servers and do not
+have to be Laravel apps. Their visitors' browsers send the data directly to this app.
 
-```html
-<script defer data-site="01JC7…" src="https://stats.example.com/js/stats.js"></script>
-```
+1. **Choose where the collector lives.** The tracking script, the collector and the read API can run
+   on their own domain, for example `stats.example.com`, while the dashboard stays on the app's
+   normal domain:
+
+   ```dotenv
+   STATS_COLLECTOR_DOMAIN=stats.example.com
+   ```
+
+   Point that domain at the same Laravel app (DNS record, a web server `server` block with the same
+   `root` and PHP handling, a TLS certificate). Leave it empty to serve them on the app's own domain
+   under `STATS_COLLECTOR_PATH` (empty by default, so the script is at `/js/stats.js`).
+
+2. **Add each website** with `stats:site create` (or on the dashboard) and put the printed snippet in
+   the `<head>` of its pages:
+
+   ```bash
+   php artisan stats:site create --name="Example" --domain=example.com --domain=*.example.org --timezone=Europe/Berlin
+   ```
+
+   ```html
+   <script defer data-site="01JC7…" src="https://stats.example.com/js/stats.js"></script>
+   ```
+
+   With `collector_domain` set, the snippet points to `https://` on that domain; otherwise its URL is
+   built from `APP_URL`, so set `APP_URL` to the app's public URL first.
+
+3. **Other Laravel sites** can also count on their own server (AI fetches, page views, events) and
+   send it to this app in [client mode](#counting-on-the-server). Each such request crosses the
+   network, so prefer the single-site setup for Laravel sites far from the host.
+
+4. With more than one site, the dashboard (or the Filament page) has a site switcher.
+
+## Site settings
+
+Each counted website, in either setup, is a site with these settings (`stats:site create` and
+`update`, the dashboard's Sites page or the Filament Sites resource):
 
 - **Domains** are the hostnames allowed to send data for the site. `example.com` also accepts
   `www.example.com`; `*.example.com` accepts `example.com` and every subdomain. Events from other
@@ -281,7 +318,7 @@ interface is in English and Simplified Chinese and follows your app's locale (`z
 It has a light and a dark theme that follow the system setting, works down to phone width, and
 respects reduced motion.
 
-- Site switcher and date ranges (today, yesterday, 7, 15, 30 and 90 days, this month, last month,
+- Site switcher (with more than one site) and date ranges (today, yesterday, 7, 15, 30 and 90 days, this month, last month,
   custom). Changes are computed over complete days: a range that includes today compares its days up
   to yesterday with the same number of days before (today alone compares yesterday with the day
   before); the page shows both compared ranges.
@@ -324,7 +361,7 @@ $panel->plugin(StatsPlugin::make()->navigationGroup('Analytics')->navigationLabe
 
 It adds, built from native Filament components so they follow your panel's colours and dark mode:
 
-- a statistics page: site and range filters kept in the URL, the key figures with their change over
+- a statistics page: site (with more than one site) and range filters kept in the URL, the key figures with their change over
   complete days and daily sparklines, the daily traffic chart, and the reports in tabs (pages,
   sources, visitors, events, AI) as sortable, searchable, paginated tables with CSV export and
   doughnut charts;
@@ -414,7 +451,7 @@ Publish the file with `php artisan vendor:publish --tag=stats-config`. Main opti
 | `dashboard_enabled` | `STATS_DASHBOARD_ENABLED` | `true` | Serve the standalone dashboard and site management pages; turn off when the host shows the statistics in its own admin (Filament plugin) |
 | `dashboard_path` | `STATS_DASHBOARD_PATH` | `stats` | Dashboard route prefix |
 | `dashboard_middleware` | | `['web']` | Middleware of the dashboard routes (the `viewStats` gate is always applied) |
-| `host_site` | `STATS_HOST_SITE` | none | Host mode: public id of the site the middleware and `Stats::event()` count for; none = found by the `Host` header |
+| `host_site` | `STATS_HOST_SITE` | none | Host mode: public id of the app's own site, used by the middleware, `Stats::event()` and `@statsScript` (which prints a tag only on that site's domains); none = found by the `Host` header |
 | `visit_timeout_minutes` | | `30` | Idle time that ends a visit |
 | `retention_days` | `STATS_RETENTION_DAYS` | none | Days to keep daily aggregates; none = forever |
 | `rate_limits` | | | Collector limits per site (3000/min), per IP (120/min, IPv6 per /64) and per visitor (60/min); AI fetches per site (600/min), API per token (60/min), public counts per IP (120/min) |

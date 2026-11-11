@@ -201,3 +201,13 @@ it('renders the statistics page in Simplified Chinese', function () {
         ->assertSee('页面')
         ->assertDontSee('stats::');
 });
+
+it('hides the site filter when there is a single site', function () {
+    FilamentPanel::allowStats();
+    S::site('Only');
+
+    $this->get('/admin/stats')->assertOk()->assertDontSee('filters.site', false)->assertSee('filters.range', false);
+
+    S::site('Second');
+    $this->get('/admin/stats')->assertOk()->assertSee('filters.site', false);
+});

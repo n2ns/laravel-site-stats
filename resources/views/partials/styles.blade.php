@@ -74,6 +74,7 @@
 .stats-dash .toolbar label{display:flex;flex-direction:column;gap:2px;font-size:var(--fs-xs);color:var(--muted);min-width:0}
 .stats-dash .site-switch select{font-size:var(--fs-lg);font-weight:650;border-color:transparent;background:transparent;padding:4px 32px 4px 6px;margin-left:-6px;max-width:100%}
 .stats-dash .site-switch select:hover{border-color:var(--border-strong)}
+.stats-dash .site-switch .site-name{display:block;font-size:var(--fs-lg);font-weight:650;padding:4px 0}
 .stats-dash .range-form .custom{display:flex;flex-wrap:wrap;gap:var(--space-2)}
 .stats-dash .period{font-size:var(--fs-sm);color:var(--muted);margin:0 0 var(--space-5)}
 .stats-dash .period strong{color:var(--text-2);font-weight:600}
