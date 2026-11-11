@@ -554,7 +554,7 @@ it('ships light and dark design tokens, focus styles and reduced motion', functi
         ->toContain('<body class="stats-dash">')
         ->toContain('.stats-dash{')
         ->toContain('--bg:#fafafa;--surface:#ffffff;')                // Filament's light zinc
-        ->toContain('@media (prefers-color-scheme:dark){.stats-dash:not(.stats-filament){')
+        ->toContain('@media (prefers-color-scheme:dark){.stats-dash:not(.stats-filament):not(.stats-embedded){')
         ->toContain('--bg:#09090b;--surface:#18181b;')                // and dark zinc
         ->toContain('--accent:var(--primary-600,#d97706)')            // inside a panel: its primary colour
         ->toContain('font-variant-numeric:tabular-nums')

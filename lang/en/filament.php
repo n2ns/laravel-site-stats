@@ -85,7 +85,7 @@ return [
 
     // Sites resource.
     'sites' => [
-        'title' => 'Sites',
+        'title' => 'Site settings',
         'model' => 'site',
         'open_settings' => 'Site settings',
         'create' => 'Create site',

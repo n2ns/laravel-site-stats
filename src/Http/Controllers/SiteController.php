@@ -7,6 +7,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use N2ns\Stats\Http\View\Page;
 use N2ns\Stats\Models\Site;
 
 class SiteController
@@ -44,7 +45,7 @@ class SiteController
     /** @param array<string, mixed> $extra */
     private function page(array $extra = []): View
     {
-        return view('stats::sites', $extra + [
+        return Page::make((string) __('stats::sites.title'), 'stats::sites', $extra + [
             'sites' => Site::query()->orderBy('name')->orderBy('id')->get(),
             'timezones' => timezone_identifiers_list(),
             'scriptUrl' => route('stats.script'),

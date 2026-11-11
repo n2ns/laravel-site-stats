@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'title' => '站点',
+    'title' => '站点配置',
     'new_site' => '新建站点',
     'none' => '还没有站点。请在下方创建第一个站点。',
     'open_dashboard' => '打开统计面板',

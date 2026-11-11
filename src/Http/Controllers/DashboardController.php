@@ -6,6 +6,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use N2ns\Stats\Http\View\Dashboard;
+use N2ns\Stats\Http\View\Page;
 use N2ns\Stats\Models\Site;
 use N2ns\Stats\Reports\StatsQuery;
 use Symfony\Component\HttpFoundation\Response;
@@ -35,7 +36,7 @@ class DashboardController
         $site = $this->site($publicId);
         $data = Dashboard::data($this->stats, $site, self::query($request, 'range'), self::query($request, 'from'), self::query($request, 'to'));
 
-        return view('stats::dashboard', $data + [
+        return Page::make($site->name, 'stats::dashboard', $data + [
             'sites' => Site::query()->orderBy('name')->orderBy('id')->get(),
             'siteAction' => route('stats.dashboard'),
             'rangeAction' => route('stats.dashboard.site', ['publicId' => $site->public_id]),

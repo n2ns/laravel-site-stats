@@ -6,6 +6,16 @@ All notable changes to N2N Stats are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The dashboard and site pages can be shown inside the host's own Blade admin layout, with its menu around them:
+  `dashboard_layout` names a layout to extend or a layout component.
+- An optional back link at the top of the dashboard and site pages (`dashboard_back_url`, `dashboard_back_label`).
+
+### Changed
+
+- The site management page is titled Site settings, like the button that opens it.
+
 ## [0.1.6] - 2026-11-12
 
 ### Changed

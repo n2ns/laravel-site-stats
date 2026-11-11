@@ -1,7 +1,7 @@
 <style>
 /* Design tokens, after Filament's default look (zinc grays, amber primary; Tailwind's palette): light theme by
-   default, dark theme from prefers-color-scheme; inside a Filament panel (.stats-filament) its own primary colour
-   and .dark class. */
+   default, dark theme from prefers-color-scheme (not inside a host's admin layout, .stats-embedded); inside a
+   Filament panel (.stats-filament) its own primary colour and .dark class. */
 .stats-dash{
   color-scheme:light;
   --bg:#fafafa;--surface:#ffffff;--surface-2:#fafafa;--text:#09090b;--text-2:#3f3f46;--muted:#71717a;
@@ -17,7 +17,7 @@
   --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   color:var(--text);font:var(--fs-md)/1.5 var(--font);-webkit-text-size-adjust:100%;
 }
-@media (prefers-color-scheme:dark){.stats-dash:not(.stats-filament){
+@media (prefers-color-scheme:dark){.stats-dash:not(.stats-filament):not(.stats-embedded){
   color-scheme:dark;
   --bg:#09090b;--surface:#18181b;--surface-2:rgba(255,255,255,.04);--text:#fafafa;--text-2:#d4d4d8;--muted:#a1a1aa;
   --border:rgba(255,255,255,.10);--border-strong:rgba(255,255,255,.20);--accent:#fbbf24;--accent-hover:#fcd34d;--on-accent:#09090b;
@@ -43,6 +43,14 @@
 .stats-dash [hidden]{display:none!important}
 .stats-dash a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:2px}
 .stats-dash a:hover{color:var(--accent-hover)}
+.stats-dash a.stats-back{display:inline-flex;align-items:center;gap:4px;color:var(--text-2);text-decoration:none;font-size:var(--fs-sm);font-weight:500;padding:6px 10px 6px 6px;border-radius:var(--radius-sm)}
+.stats-dash a.stats-back:hover{background:var(--surface-2);color:var(--text)}
+.stats-dash a.stats-back svg{width:18px;height:18px;flex:none}
+.stats-dash.stats-embedded nav.main{display:flex;gap:var(--space-1);margin-left:auto}
+.stats-dash.stats-embedded nav.main a{color:var(--text-2);text-decoration:none;font-size:var(--fs-sm);font-weight:500;padding:6px 10px;border-radius:var(--radius-sm)}
+.stats-dash.stats-embedded nav.main a:hover{background:var(--surface-2);color:var(--text)}
+.stats-dash.stats-embedded nav.main a[aria-current=page]{color:var(--accent);background:var(--accent-soft)}
+.stats-dash .stats-topbar{display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-5)}
 .stats-dash h1,.stats-dash h2,.stats-dash h3{font-weight:600;line-height:1.4;margin:0}
 .stats-dash :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
 .stats-dash .muted{color:var(--muted)}

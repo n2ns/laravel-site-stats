@@ -28,6 +28,19 @@ return [
     'dashboard_middleware' => ['web'],
 
     /*
+    | Show the dashboard and site pages inside the host's own admin layout instead of standalone (null):
+    |   ['view' => 'admin.layout', 'section' => 'content', 'title_sections' => ['title']]  a layout to @extends
+    |   ['component' => 'layouts.app']  a layout component; the page goes in its slot, the title in its title attribute
+    | The pages keep the light theme there.
+    */
+    'dashboard_layout' => null,
+
+    // A link back to the host's admin at the top of the dashboard and site pages (e.g. '/admin'); none when null.
+    'dashboard_back_url' => env('STATS_DASHBOARD_BACK_URL'),
+    // Its text; the translated "Back" when null.
+    'dashboard_back_label' => null,
+
+    /*
     | Host mode: public id of the app's own site, which the TrackAiFetches and TrackPageviews middleware and Stats::event()
     | count for and @statsScript prints (only on the site's own domains). When null, the site is found by the request's
     | Host header (only safe when the web server rejects unknown hosts; the oldest site when several match).

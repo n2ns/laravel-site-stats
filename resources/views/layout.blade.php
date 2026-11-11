@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="light dark">
-<title>@yield('title') · {{ __('stats::dashboard.brand') }}</title>
+<title>{{ $title }} · {{ __('stats::dashboard.brand') }}</title>
 @include('stats::partials.styles')
 <style>
 html,body{margin:0}
@@ -16,6 +16,7 @@ body.stats-dash{background:var(--bg);min-height:100vh}
 .stats-dash .brand{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:var(--fs-md);color:var(--text);text-decoration:none}
 .stats-dash .brand:hover{color:var(--text)}
 .stats-dash .brand svg{width:22px;height:22px;flex:none}
+.stats-dash .appbar-start{display:flex;align-items:center;gap:var(--space-4)}
 .stats-dash nav.main{display:flex;gap:var(--space-1)}
 .stats-dash nav.main a{color:var(--text-2);text-decoration:none;font-size:var(--fs-sm);font-weight:500;padding:6px 10px;border-radius:var(--radius-sm)}
 .stats-dash nav.main a:hover{background:var(--surface-2);color:var(--text)}
@@ -26,16 +27,18 @@ body.stats-dash{background:var(--bg);min-height:100vh}
 <body class="stats-dash">
 <header class="appbar">
 <div class="appbar-inner">
+<div class="appbar-start">
+@include('stats::partials.back')
 <a class="brand" href="{{ route('stats.dashboard') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="6" fill="var(--accent)"/><path d="M6 16l4-5 3 3 5-6" fill="none" stroke="var(--on-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>{{ __('stats::dashboard.brand') }}</a>
-<nav class="main" aria-label="{{ __('stats::dashboard.nav.main') }}"><a href="{{ route('stats.dashboard') }}"@if (request()->routeIs('stats.dashboard*')) aria-current="page"@endif>{{ __('stats::dashboard.nav.dashboard') }}</a><a href="{{ route('stats.sites.index') }}"@if (request()->routeIs('stats.sites.*')) aria-current="page"@endif>{{ __('stats::dashboard.nav.sites') }}</a></nav>
+</div>
+@include('stats::partials.nav')
 </div>
 </header>
 <div class="wrap">
 <main>
-@yield('content')
+{{ $body }}
 </main>
 <footer>{{ __('stats::dashboard.footer') }}</footer>
 </div>
-@stack('scripts')
 </body>
 </html>

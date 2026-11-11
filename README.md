@@ -353,8 +353,22 @@ follow the system setting, works down to phone width, and respects reduced motio
   countries, devices, browsers, operating systems, site languages and page types also have a donut
   chart. The wide charts span the tab; the other charts and reports alternate between two columns
   that stack their cards (one column, in the same order, on narrow screens).
-- Site management: add sites, edit domains, timezone, site languages, excluded paths and public
-  counts, show and copy the embed snippet, reset the server key (shown once).
+- Site management (Site settings, top right): add sites, edit domains, timezone, site languages,
+  excluded paths and public counts, show and copy the embed snippet, reset the server key (shown once).
+
+The pages are standalone by default. To show them inside your own Blade admin, with its menu around
+them, set `dashboard_layout` to a layout to extend or to a layout component (there they keep the
+light theme):
+
+```php
+// config/stats.php
+'dashboard_layout' => ['view' => 'admin.layout', 'section' => 'content', 'title_sections' => ['title']],
+// or: 'dashboard_layout' => ['component' => 'layouts.app'],   // page in its slot, title in its title attribute
+'dashboard_back_url' => '/admin',   // a "Back" link at the top of the pages
+```
+
+Admins built with Inertia or another single-page front end can't wrap Blade pages; link to the
+standalone pages from their menu, and set `dashboard_back_url` to come back.
 
 ## Filament
 
@@ -461,6 +475,9 @@ Publish the file with `php artisan vendor:publish --tag=stats-config`. Main opti
 | `dashboard_enabled` | `STATS_DASHBOARD_ENABLED` | `true` | Serve the standalone dashboard and site management pages; turn off when the host shows the statistics in its own admin (Filament plugin) |
 | `dashboard_path` | `STATS_DASHBOARD_PATH` | `stats` | Dashboard route prefix |
 | `dashboard_middleware` | | `['web']` | Middleware of the dashboard routes (the `viewStats` gate is always applied) |
+| `dashboard_layout` | | `null` | Host admin layout for the dashboard and site pages: `['view' => …, 'section' => …, 'title_sections' => […]]` or `['component' => …]`; standalone when null |
+| `dashboard_back_url` | `STATS_DASHBOARD_BACK_URL` | `null` | Address of a back link at the top of the dashboard and site pages |
+| `dashboard_back_label` | | `null` | Text of the back link (the translated "Back" when null) |
 | `host_site` | `STATS_HOST_SITE` | none | Host mode: public id of the app's own site, used by the middleware, `Stats::event()` and `@statsScript` (which prints a tag only on that site's domains); none = found by the `Host` header |
 | `visit_timeout_minutes` | | `30` | Idle time that ends a visit |
 | `retention_days` | `STATS_RETENTION_DAYS` | none | Days to keep daily aggregates; none = forever |

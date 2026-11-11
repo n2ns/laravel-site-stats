@@ -1,6 +1,3 @@
-@extends('stats::layout')
-@section('title', __('stats::sites.title'))
-@section('content')
 <div class="page-head">
 <h1>{{ __('stats::sites.title') }}</h1>
 <a class="button" href="#new-site">{{ __('stats::sites.new_site') }}</a>
@@ -67,9 +64,6 @@
 @include('stats::partials.site-form', ['site' => null, 'bag' => 'create', 'action' => route('stats.sites.store'), 'method' => 'POST', 'submit' => __('stats::sites.create')])
 </section>
 </div>
-@endsection
-
-@push('scripts')
 <script>
 (function () {
   var copied = @json(__('stats::sites.copied')), failed = @json(__('stats::sites.copy_failed'));
@@ -93,4 +87,3 @@
   });
 })();
 </script>
-@endpush

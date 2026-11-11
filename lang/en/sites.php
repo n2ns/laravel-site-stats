@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'title' => 'Sites',
+    'title' => 'Site settings',
     'new_site' => 'New site',
     'none' => 'No sites yet. Create the first one below.',
     'open_dashboard' => 'Open dashboard',

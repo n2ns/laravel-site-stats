@@ -85,7 +85,7 @@ return [
 
     // Sites resource.
     'sites' => [
-        'title' => '站点',
+        'title' => '站点配置',
         'model' => '站点',
         'open_settings' => '站点配置',
         'create' => '创建站点',
