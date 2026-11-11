@@ -2,7 +2,6 @@
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Testing\TestResponse;
 use N2ns\Stats\Models\Site;
 
@@ -120,7 +119,7 @@ it('records unknown country and language when headers are missing or reserved', 
 })->with(['', 'XX', 'T1', 'de', 'USA']);
 
 it('logs a warning instead of failing when the write fails', function () {
-    Schema::drop('stats_daily_totals');
+    failWritesTo('stats_daily_totals');
     Log::shouldReceive('warning')->once();
 
     sendEvent(pageviewFor($this->site))->assertNoContent();

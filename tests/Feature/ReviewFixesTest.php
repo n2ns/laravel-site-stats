@@ -3,7 +3,6 @@
 use Illuminate\Cache\RateLimiter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 use N2ns\Stats\Models\Site;
 use N2ns\Stats\Reports\StatsQuery;
 
@@ -85,7 +84,7 @@ it('counts realtime visitors correctly when the app timezone is not UTC', functi
 });
 
 it('logs only the exception class when a write fails', function () {
-    Schema::drop('stats_daily_pages');
+    failWritesTo('stats_daily_pages');
     Log::shouldReceive('warning')->once()->withArgs(function (string $message, array $context): bool {
         return ! str_contains(json_encode($context), 'stats_daily_pages') && str_contains($context['exception'], 'Exception');
     });

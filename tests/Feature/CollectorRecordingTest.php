@@ -3,7 +3,6 @@
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 use N2ns\Stats\Models\Site;
 use N2ns\Stats\Recording\Recorder;
 
@@ -277,7 +276,7 @@ it('removes the uniques row when the counter write fails', function () {
     recHit($this->site, 'pageview', 'https://example.com/a');
     $before = DB::table('stats_uniques')->count();
 
-    Schema::drop('stats_daily_pages');
+    failWritesTo('stats_daily_pages');
     Log::shouldReceive('warning')->once();
     recHit($this->site, 'pageview', 'https://example.com/b');
 
