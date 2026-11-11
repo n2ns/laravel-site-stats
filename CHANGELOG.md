@@ -6,6 +6,8 @@ All notable changes to N2N Stats are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-11-12
+
 ### Added
 
 - The dashboard and site pages can be shown inside the host's own Blade admin layout, with its menu around them:
@@ -166,6 +168,7 @@ All notable changes to N2N Stats are listed here. The format follows
 - Commands `stats:install`, `stats:site`, `stats:token` and `stats:maintain` (scheduled every five
   minutes); configurable retention of aggregates.
 
+[0.1.7]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.7
 [0.1.6]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.6
 [0.1.5]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.5
 [0.1.4]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.4
