@@ -6,6 +6,8 @@ All notable changes to N2N Stats are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-11-11
+
 ### Changed
 
 - The report tabs stand out: larger, semibold labels, the selected tab filled with the primary colour (the panel's
@@ -142,6 +144,7 @@ All notable changes to N2N Stats are listed here. The format follows
 - Commands `stats:install`, `stats:site`, `stats:token` and `stats:maintain` (scheduled every five
   minutes); configurable retention of aggregates.
 
+[0.1.5]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.5
 [0.1.4]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.4
 [0.1.3]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.3
 [0.1.2]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.2
