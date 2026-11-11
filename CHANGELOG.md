@@ -6,6 +6,8 @@ All notable changes to N2N Stats are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-11
+
 ### Changed
 
 - The package is renamed from `n2ns/laravel-stats` to `n2ns/laravel-site-stats`, so it is not confused
@@ -99,6 +101,7 @@ All notable changes to N2N Stats are listed here. The format follows
 - Commands `stats:install`, `stats:site`, `stats:token` and `stats:maintain` (scheduled every five
   minutes); configurable retention of aggregates.
 
+[0.1.3]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.3
 [0.1.2]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.2
 [0.1.1]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.1
 [0.1.0]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.0
