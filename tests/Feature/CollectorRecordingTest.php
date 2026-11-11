@@ -74,7 +74,7 @@ it('starts a new visit after 30 minutes of inactivity', function () {
 
     expect(recTotals())->toMatchArray(['pageviews' => 3, 'visitors' => 1, 'visits' => 2])
         ->and(recPageRow('/a'))->toMatchArray(['entries' => 2, 'visitors' => 1, 'entry_visitors' => 1]) // one visitor entering twice
-        ->and(DB::table('stats_daily_sources')->pluck('visits', 'source_type')->map(fn ($v) => (int) $v)->all())->toBe(['direct' => 1, 'ai' => 1]);
+        ->and(DB::table('stats_daily_sources')->orderBy('source_type')->pluck('visits', 'source_type')->map(fn ($v) => (int) $v)->all())->toBe(['ai' => 1, 'direct' => 1]);
 
     $dims = DB::table('stats_daily_dimensions')->get();
     expect($dims)->toHaveCount(5)
