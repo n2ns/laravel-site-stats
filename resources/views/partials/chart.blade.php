@@ -1,13 +1,14 @@
 {{--
     Inline SVG line chart of one metric at a time, with a metric selector (radio buttons: works without JS),
     a hover/keyboard tooltip (partials.scripts) and the data table. Needs: $series (rows with 'date' and one int
-    per metric), $metrics (list of metric keys, at most 6), $title, $id.
+    per metric), $metrics (list of metric keys, at most 6), $title, $id; optionally $previous (the days just before,
+    drawn as a dashed line).
 --}}
 @php
     use N2ns\Stats\Http\View\Dashboard;
     use N2ns\Stats\Http\View\Format;
     use N2ns\Stats\Http\View\LineChart;
-    $chart = LineChart::build($series, $metrics);
+    $chart = LineChart::build($series, $metrics, $previous ?? null);
     $labels = [];
     foreach ($metrics as $metric) {
         $labels[$metric] = __('stats::dashboard.metrics.'.$metric);
@@ -25,6 +26,9 @@
 <label for="{{ $id }}-metric-{{ $metric }}" class="t{{ $i }}">{{ $labels[$metric] }}</label>
 @endforeach
 </div>
+@isset($previous)
+<span class="prev-note">{{ __('stats::dashboard.chart.previous') }}</span>
+@endisset
 </div>
 <div class="plot-wrap">
 <div class="y-axis" aria-hidden="true">
@@ -44,6 +48,9 @@
 <line class="baseline" x1="0" x2="{{ LineChart::WIDTH }}" y1="{{ LineChart::HEIGHT }}" y2="{{ LineChart::HEIGHT }}" vector-effect="non-scaling-stroke"/>
 @foreach ($metrics as $i => $metric)
 <g class="layer l{{ $i }}" data-metric="{{ $metric }}">
+@if ($chart['layers'][$metric]['previous'] !== null)
+<path class="prev" d="{{ $chart['layers'][$metric]['previous'] }}" vector-effect="non-scaling-stroke"/>
+@endif
 <path class="area" d="{{ $chart['layers'][$metric]['area'] }}"/>
 <path class="line" d="{{ $chart['layers'][$metric]['line'] }}" vector-effect="non-scaling-stroke"/>
 </g>

@@ -21,7 +21,7 @@ final class Dashboard
     ];
 
     /** Reports that also get a donut chart of their main metric. */
-    public const DONUTS = ['source_types', 'countries', 'devices', 'locales', 'page_types'];
+    public const DONUTS = ['source_types', 'countries', 'devices', 'browsers', 'os', 'locales', 'page_types'];
 
     /** Metrics of the daily chart and its data table. */
     public const CHART_METRICS = ['visitors', 'visits', 'pageviews', 'events', 'outbound'];
@@ -106,6 +106,7 @@ final class Dashboard
 
         $summary = $stats->summary($site, $period->from, $period->to);
         $series = $stats->timeseries($site, $period->from, $period->to);
+        [$previousFrom, $previousTo] = self::previousRange($period->from, $period->to);
 
         return [
             'site' => $site,
@@ -114,6 +115,8 @@ final class Dashboard
             'rangeError' => $error,
             'summary' => $summary,
             'series' => $series,
+            'previousSeries' => $stats->timeseries($site, $previousFrom, $previousTo),
+            'charts' => Charts::all($stats, $site, $period->from, $period->to),
             'kpis' => self::kpis($summary, $series),
             'ai' => $stats->ai($site, $period->from, $period->to),
             'realtime' => $stats->realtimeVisitors($site),
@@ -124,6 +127,18 @@ final class Dashboard
                 ? ['range' => 'custom', 'from' => $period->from->toDateString(), 'to' => $period->to->toDateString()]
                 : ['range' => $range],
         ];
+    }
+
+    /**
+     * The days just before a range, as many as it has (the dashed line of the daily chart).
+     *
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}
+     */
+    public static function previousRange(CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        $days = (int) $from->startOfDay()->diffInDays($to->startOfDay()) + 1;
+
+        return [$from->startOfDay()->subDays($days), $from->startOfDay()->subDay()];
     }
 
     /**

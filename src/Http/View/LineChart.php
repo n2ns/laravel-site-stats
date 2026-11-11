@@ -24,13 +24,14 @@ final class LineChart
     /**
      * @param  list<array<string, int|string>>  $series  one row per day: 'date' and an int per metric
      * @param  list<string>  $metrics
+     * @param  list<array<string, int|string>>|null  $previous  the same number of days just before, drawn as a dashed line
      * @return array{
-     *     layers: array<string, array{line: string, area: string, top: int, ticks: list<array{value: int, pct: float}>, values: list<int>}>,
+     *     layers: array<string, array{line: string, area: string, previous: string|null, top: int, ticks: list<array{value: int, pct: float}>, values: list<int>, previousValues: list<int>}>,
      *     labels: list<array{index: int, pct: float, date: string, minor: bool, anchor: string}>,
      *     dates: list<string>,
      * }
      */
-    public static function build(array $series, array $metrics): array
+    public static function build(array $series, array $metrics, ?array $previous = null): array
     {
         $count = count($series);
         $xs = [];
@@ -41,43 +42,85 @@ final class LineChart
         $layers = [];
         foreach ($metrics as $metric) {
             $values = array_map(fn (array $row): int => (int) $row[$metric], $series);
-            $top = self::niceTop($values === [] ? 0 : max($values));
-            $points = [];
-            foreach ($values as $i => $value) {
-                $points[] = [round($xs[$i] * self::WIDTH, 1), round((1 - $value / $top) * self::HEIGHT, 1)];
-            }
-            if (count($points) === 1) {
-                // A single day: a flat line across the plot.
-                $points = [[0.0, $points[0][1]], [(float) self::WIDTH, $points[0][1]]];
-            }
+            $previousValues = $previous === null ? [] : array_map(fn (array $row): int => (int) $row[$metric], array_slice($previous, 0, $count));
+            $top = self::niceTop(max([0, ...$values, ...$previousValues]));
+            $points = self::points($values, $xs, $top);
 
-            $ticks = [];
-            for ($t = 0; $t <= self::TICKS; $t++) {
-                $value = intdiv($top * $t, self::TICKS);
-                $ticks[] = ['value' => $value, 'pct' => round(100 - $t * 100 / self::TICKS, 2)];
-            }
+            $ticks = self::ticks($top);
 
             $layers[$metric] = [
                 'line' => self::path($points),
                 'area' => $points === [] ? '' : self::path($points).' L'.end($points)[0].' '.self::HEIGHT.' L'.$points[0][0].' '.self::HEIGHT.' Z',
+                'previous' => $previousValues === [] ? null : self::path(self::points($previousValues, $xs, $top)),
                 'top' => $top,
                 'ticks' => $ticks,
                 'values' => $values,
+                'previousValues' => $previousValues,
             ];
         }
 
+        $dates = array_map(fn (array $row): string => (string) $row['date'], $series);
+
+        return ['layers' => $layers, 'labels' => self::xLabels($dates), 'dates' => $dates];
+    }
+
+    /**
+     * Plot points of daily values, spread evenly over the width ($xs: 0..1 per day).
+     *
+     * @param  list<int>  $values
+     * @param  list<float|int>  $xs
+     * @return list<array{0: float, 1: float}>
+     */
+    public static function points(array $values, array $xs, int $top): array
+    {
+        $points = [];
+        foreach ($values as $i => $value) {
+            $points[] = [round($xs[$i] * self::WIDTH, 1), round((1 - $value / max(1, $top)) * self::HEIGHT, 1)];
+        }
+        if (count($points) === 1) {
+            // A single day: a flat line across the plot.
+            $points = [[0.0, $points[0][1]], [(float) self::WIDTH, $points[0][1]]];
+        }
+
+        return $points;
+    }
+
+    /**
+     * Date labels of the x axis: evenly spaced days, every other one marked minor (hidden on narrow screens).
+     *
+     * @param  list<string>  $dates
+     * @return list<array{index: int, pct: float, date: string, minor: bool, anchor: string}>
+     */
+    public static function xLabels(array $dates): array
+    {
+        $count = count($dates);
         $labels = [];
         foreach (self::labelIndexes($count) as $n => $i) {
             $labels[] = [
                 'index' => $i,
-                'pct' => round($xs[$i] * 100, 2),
-                'date' => (string) $series[$i]['date'],
+                'pct' => $count > 1 ? round($i / ($count - 1) * 100, 2) : 50.0,
+                'date' => $dates[$i],
                 'minor' => $n % 2 === 1 && $i !== $count - 1,
                 'anchor' => $count === 1 ? 'middle' : ($i === 0 ? 'start' : ($i === $count - 1 ? 'end' : 'middle')),
             ];
         }
 
-        return ['layers' => $layers, 'labels' => $labels, 'dates' => array_map(fn (array $row): string => (string) $row['date'], $series)];
+        return $labels;
+    }
+
+    /**
+     * Ticks of the y axis from 0 to $top.
+     *
+     * @return list<array{value: int, pct: float}>
+     */
+    public static function ticks(int $top): array
+    {
+        $ticks = [];
+        for ($t = 0; $t <= self::TICKS; $t++) {
+            $ticks[] = ['value' => intdiv($top * $t, self::TICKS), 'pct' => round(100 - $t * 100 / self::TICKS, 2)];
+        }
+
+        return $ticks;
     }
 
     /**
@@ -105,7 +148,7 @@ final class LineChart
     }
 
     /** @param list<array{0: float, 1: float}> $points */
-    private static function path(array $points): string
+    public static function path(array $points): string
     {
         $d = '';
         foreach ($points as [$x, $y]) {
@@ -132,7 +175,7 @@ final class LineChart
     }
 
     /** Axis maximum: TICKS times a step of 1, 2 or 5 times a power of ten, at least the largest value. */
-    private static function niceTop(int $max): int
+    public static function niceTop(int $max): int
     {
         $rough = max(1, $max) / self::TICKS;
         $magnitude = 10 ** (int) floor(log10($rough));

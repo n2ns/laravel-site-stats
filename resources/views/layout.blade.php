@@ -10,17 +10,17 @@
 <style>
 html,body{margin:0}
 body.stats-dash{background:var(--bg);min-height:100vh}
-.stats-dash .appbar{background:var(--surface);border-bottom:1px solid var(--border)}
-.stats-dash .appbar-inner,.stats-dash .wrap{max-width:1200px;margin:0 auto;padding:0 var(--space-4)}
-.stats-dash .appbar-inner{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);min-height:56px}
+.stats-dash .appbar{background:var(--surface);border-bottom:1px solid var(--border);box-shadow:var(--shadow)}
+.stats-dash .appbar-inner,.stats-dash .wrap{max-width:1280px;margin:0 auto;padding:0 var(--space-5)}
+.stats-dash .appbar-inner{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);min-height:64px}
 .stats-dash .brand{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:var(--fs-md);color:var(--text);text-decoration:none}
 .stats-dash .brand:hover{color:var(--text)}
 .stats-dash .brand svg{width:22px;height:22px;flex:none}
 .stats-dash nav.main{display:flex;gap:var(--space-1)}
 .stats-dash nav.main a{color:var(--text-2);text-decoration:none;font-size:var(--fs-sm);font-weight:500;padding:6px 10px;border-radius:var(--radius-sm)}
 .stats-dash nav.main a:hover{background:var(--surface-2);color:var(--text)}
-.stats-dash nav.main a[aria-current=page]{color:var(--text);background:var(--surface-2);font-weight:600}
-.stats-dash .wrap{padding-top:var(--space-5);padding-bottom:var(--space-4)}
+.stats-dash nav.main a[aria-current=page]{color:var(--accent);background:var(--accent-soft)}
+.stats-dash .wrap{padding-top:var(--space-6);padding-bottom:var(--space-4)}
 </style>
 </head>
 <body class="stats-dash">

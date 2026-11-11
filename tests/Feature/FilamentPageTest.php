@@ -9,7 +9,9 @@ use N2ns\Stats\Filament\Widgets\Report\AiKpis;
 use N2ns\Stats\Filament\Widgets\Report\Kpis;
 use N2ns\Stats\Filament\Widgets\Report\ReportChart;
 use N2ns\Stats\Filament\Widgets\Report\ReportTable;
+use N2ns\Stats\Filament\Widgets\Report\TabChart;
 use N2ns\Stats\Filament\Widgets\Report\TrafficChart;
+use N2ns\Stats\Http\View\Charts;
 use N2ns\Stats\Http\View\Dashboard;
 use N2ns\Stats\Reports\StatsQuery;
 use N2ns\Stats\Tests\Feature\FilamentPanel;
@@ -31,7 +33,7 @@ it('refuses the statistics page and its widgets without the viewStats gate', fun
     $site = S::site('Alpha');
     $this->get('/admin/stats')->assertForbidden();
     expect(StatsDashboard::canAccess())->toBeFalse();
-    foreach ([Kpis::class, TrafficChart::class, AiKpis::class, AiChart::class, ReportChart::class, ReportTable::class] as $widget) {
+    foreach ([Kpis::class, TrafficChart::class, AiKpis::class, AiChart::class, ReportChart::class, ReportTable::class, TabChart::class] as $widget) {
         expect($widget::canView())->toBeFalse();
         Livewire::test($widget, ['pageFilters' => ['site' => $site->public_id]])->assertForbidden();
     }
@@ -50,7 +52,7 @@ it('renders the statistics page natively with KPIs, the chart and every report t
     $response->assertSee('class="fi', false)
         ->assertSee('Reports')
         ->assertSee('Analytics')
-        ->assertDontSee('stats-dash')                       // no embedded standalone dashboard
+        ->assertDontSee('class="toolbar"', false)           // no embedded standalone dashboard (its styles serve the tab charts)
         ->assertSee('Compared: Mar 4–9 vs Feb 26 – Mar 3, complete days only.')
         ->assertSee('Today is still in progress')
         ->assertSeeInOrder(['Visitors', '1,234', '+23.4% vs previous period', 'Bounce rate', '20.0%', '+100.0% vs previous period', 'Outbound clicks', '2', 'Realtime'])
@@ -73,6 +75,8 @@ it('colours the KPI changes by whether they are better, with lower bounce rates 
     $site = S::site('Alpha');
     S::totals($site, '2026-03-09', ['visitors' => 20, 'visits' => 20, 'pageviews' => 20, 'bounces' => 2]);
     S::totals($site, '2026-03-08', ['visitors' => 10, 'visits' => 10, 'pageviews' => 30, 'bounces' => 5]);
+    S::page($site, '2026-03-09', '/a', ['pageviews' => 20, 'exits' => 20, 'entry_pageviews' => 20]);
+    S::page($site, '2026-03-08', '/a', ['pageviews' => 30, 'exits' => 10, 'entry_pageviews' => 30]);
 
     $stats = collect(invade(Livewire::test(Kpis::class, ['pageFilters' => ['site' => $site->public_id, 'range' => 'today']])->instance())->getStats())
         ->keyBy(fn ($stat) => (string) $stat->getLabel());
@@ -98,7 +102,12 @@ it('gives the charts the daily series and the donut its top slices', function ()
 
     $traffic = invade(Livewire::test(TrafficChart::class, ['pageFilters' => $filters])->instance())->getData();
     expect($traffic['labels'])->toHaveCount(7)->and(end($traffic['labels']))->toBe('2026-03-10')
-        ->and(array_column($traffic['datasets'], 'label'))->toBe(['Visitors', 'Visits', 'Pageviews', 'Events', 'Outbound clicks'])
+        ->and(array_column($traffic['datasets'], 'label'))->toBe([
+            'Visitors', 'Visits', 'Pageviews', 'Events', 'Outbound clicks',
+            'Visitors, previous period', 'Visits, previous period', 'Pageviews, previous period', 'Events, previous period', 'Outbound clicks, previous period',
+        ])
+        ->and(array_column($traffic['datasets'], 'hidden'))->toBe([true, true, true, true, true]) // only the previous period's lines
+        ->and($traffic['datasets'][7]['borderDash'])->toBe([5, 4])
         ->and($traffic['datasets'][2]['data'])->toBe([0, 0, 0, 0, 0, 7, 0]);
 
     $ai = invade(Livewire::test(AiChart::class, ['pageFilters' => $filters])->instance())->getData();
@@ -111,6 +120,59 @@ it('gives the charts the daily series and the donut its top slices', function ()
     expect($donut['labels'])->toBe(['de', 'fr', 'us', 'jp', 'cn', 'Other'])
         ->and($donut['datasets'][0]['data'])->toBe([9, 5, 4, 3, 2, 1]);
     expect(invade(Livewire::test(ReportChart::class, ['report' => 'devices', 'pageFilters' => $filters])->instance())->getData())->toBe([]);
+});
+
+it('draws the charts of the report tabs with the shared inline SVG', function () {
+    FilamentPanel::allowStats();
+    $site = S::site('Alpha');
+    $d = '2026-03-09';
+    S::page($site, $d, '/pricing', ['pageviews' => 300, 'visitors' => 200, 'title' => 'Pricing page', 'content_group' => 'Sales', 'engaged_views' => 20, 'time_30' => 12, 'scroll_75' => 9]);
+    S::transition($site, $d, '/pricing', '/signup', 12, 10);
+    S::source($site, $d, 'search', 'google.com', ['visits' => 30, 'visitors' => 28, 'pageviews' => 60, 'bounces' => 3]);
+    S::dimension($site, $d, 'country', 'DE', 25, 20, 60);
+    S::event($site, $d, 'custom', 'signup', null, '/pricing', 5, 4, 'hero');
+    S::event($site, $d, 'ai_fetch', 'gptbot', null, '/docs', 6);
+    $filters = ['site' => $site->public_id, 'range' => '7d'];
+
+    $expected = [
+        'time_on_page' => '60.0%', 'scroll_depth' => '45.0%', 'content_groups' => 'Pricing page', 'page_flow' => '/pricing → /signup: 12',
+        'source_trend' => 'Search', 'source_bounce' => '10.0%', 'world_map' => 'DE: 20 visitors', 'event_trend' => 'signup',
+        'event_rates' => '5 events / 300 page views', 'ai_fetchers' => 'gptbot',
+    ];
+    expect(array_keys($expected))->toBe(array_merge(...array_values(Charts::TABS)));
+    foreach ($expected as $chart => $text) {
+        Livewire::test(TabChart::class, ['chart' => $chart, 'pageFilters' => $filters])
+            ->assertSee(__('stats::dashboard.charts.'.$chart.'.title'))
+            ->assertSee($text)
+            ->assertSee('class="stats-dash stats-filament"', false)
+            ->assertDontSee('No data for this range.');
+    }
+    Livewire::test(TabChart::class, ['chart' => 'page_flow', 'pageFilters' => ['site' => $site->public_id, 'range' => 'today']])
+        ->assertSee('No data for this range.');
+
+    // The page includes the styles of the charts.
+    $this->get('/admin/stats?filters[site]='.$site->public_id.'&filters[range]=7d')->assertOk()
+        ->assertSee('.stats-dash .hbars', false);
+});
+
+it('deals the widgets of a tab out to a left and a right column after the wide ones', function () {
+    FilamentPanel::allowStats();
+    $site = S::site('Alpha');
+
+    $html = $this->get('/admin/stats?filters[site]='.$site->public_id.'&filters[range]=7d')->assertOk()->getContent();
+    $tabs = explode('class="stats-columns"', $html); // [before the first tab's columns, the Pages columns..., ...]
+    $wide = substr($tabs[0], (int) strrpos($tabs[0], 'fi-sc-tabs'));
+    $pages = substr($tabs[1], 0, (int) strpos($tabs[1], 'fi-sc-tabs-tab')); // up to the next tab
+    $columns = [$wide, ...array_slice(explode('class="stats-column"', $pages), 1)];
+    $keys = fn (string $html): array => (preg_match_all('/stats-(tab-chart|chart|table)-([a-z_]+)/', $html, $m) ? array_values(array_unique(array_map(fn ($a, $b) => $a.':'.$b, $m[1], $m[2]))) : []);
+
+    expect($columns)->toHaveCount(3) // the wide page flow, then the two columns
+        ->and($keys($columns[0]))->toBe(['tab-chart:page_flow'])
+        ->and($keys($columns[1]))->toBe(['tab-chart:time_on_page', 'tab-chart:content_groups', 'table:pages', 'table:exits', 'table:page_types', 'table:transitions'])
+        ->and($keys($columns[2]))->toBe(['tab-chart:scroll_depth', 'chart:page_types', 'table:entries', 'table:engagement', 'table:content'])
+        ->and(substr_count($columns[1], 'class="stats-cell"'))->toBe(6)
+        ->and($columns[2])->toContain('style="order:1"')                       // the original order, for one column on narrow screens
+        ->and($html)->toContain('.stats-column>.fi-grid>.fi-grid-col>.fi-sc-component{display:contents}');
 });
 
 it('formats report tables, pages them by 25 and sorts and searches them', function () {

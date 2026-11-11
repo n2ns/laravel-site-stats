@@ -2,6 +2,7 @@
 
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use N2ns\Stats\Reports\StatsQuery;
 use N2ns\Stats\Tests\StatsSeeder as S;
 
@@ -23,8 +24,8 @@ it('sums the range and derives per-visit metrics', function () {
 
     $s = $this->q->summary($this->site, d('2026-03-01'), d('2026-03-02'));
 
-    S::page($this->site, '2026-03-01', '/a', ['pageviews' => 3]);
-    S::page($this->site, '2026-03-02', '/a', ['pageviews' => 1]);
+    S::page($this->site, '2026-03-01', '/a', ['pageviews' => 3, 'exits' => 12, 'entry_pageviews' => 30]);
+    S::page($this->site, '2026-03-02', '/a', ['pageviews' => 1, 'exits' => 8, 'entry_pageviews' => 10]);
     S::page($this->site, '2026-03-02', '/b', ['pageviews' => 1]);
     S::page($this->site, '2026-03-02', '/only-entry', ['pageviews' => 0]);
 
@@ -36,13 +37,18 @@ it('sums the range and derives per-visit metrics', function () {
     ]);
 });
 
-it('derives views per visit only from days that recorded visits', function () {
+it('derives views per visit from the ended visits only, not from page views without visit data', function () {
     S::totals($this->site, '2026-03-01', ['visitors' => 900, 'visits' => 0, 'pageviews' => 1000]); // imported day without visits
     S::totals($this->site, '2026-03-02', ['visitors' => 4, 'visits' => 5, 'pageviews' => 15]);
+    S::page($this->site, '2026-03-01', '/', ['pageviews' => 1000]);
+    // The day counting began: 400 imported page views, then 5 visits with 15 page views, all ended.
+    S::page($this->site, '2026-03-02', '/', ['pageviews' => 415, 'entries' => 5, 'exits' => 5, 'entry_pageviews' => 15]);
+    DB::table('stats_daily_totals')->where('date', '2026-03-02')->update(['pageviews' => 415]);
 
     $s = $this->q->summary($this->site, d('2026-03-01'), d('2026-03-02'));
 
-    expect($s)->toMatchArray(['visits' => 5, 'pageviews' => 1015, 'views_per_visit' => 3.0]);
+    expect($s)->toMatchArray(['visits' => 5, 'pageviews' => 1415, 'views_per_visit' => 3.0])
+        ->and(collect($this->q->timeseries($this->site, d('2026-03-01'), d('2026-03-02')))->pluck('views_per_visit')->all())->toBe([0.0, 3.0]);
 });
 
 it('compares with the previous period of equal length', function () {
@@ -50,6 +56,8 @@ it('compares with the previous period of equal length', function () {
     S::totals($this->site, '2026-02-27', ['visitors' => 3, 'visits' => 4, 'pageviews' => 9, 'bounces' => 1, 'duration_seconds' => 80]);
     S::totals($this->site, '2026-02-28', ['visitors' => 2, 'visits' => 2, 'pageviews' => 3]);
     S::totals($this->site, '2026-03-01', ['visitors' => 10, 'visits' => 10, 'pageviews' => 10]);
+    S::page($this->site, '2026-02-27', '/a', ['pageviews' => 0, 'exits' => 4, 'entry_pageviews' => 9]);
+    S::page($this->site, '2026-02-28', '/a', ['pageviews' => 0, 'exits' => 2, 'entry_pageviews' => 3]);
 
     $s = $this->q->summary($this->site, d('2026-03-01'), d('2026-03-02'));
 
@@ -99,10 +107,11 @@ it('returns zeros without division errors when there is no data', function () {
 
 it('zero-fills the daily series in site-local dates', function () {
     S::totals($this->site, '2026-02-27', ['visitors' => 2, 'visits' => 3, 'pageviews' => 4, 'events' => 3, 'outbound' => 1, 'bounces' => 1, 'duration_seconds' => 120]);
-    S::page($this->site, '2026-02-27', '/a', ['pageviews' => 3, 'engaged_views' => 2, 'engaged_seconds' => 30]);
+    S::page($this->site, '2026-02-27', '/a', ['pageviews' => 3, 'engaged_views' => 2, 'engaged_seconds' => 30, 'exits' => 3, 'entry_pageviews' => 4]);
     S::page($this->site, '2026-02-27', '/b', ['pageviews' => 1]);
     S::page($this->site, '2026-02-27', '/entry-only', ['pageviews' => 0]);
     S::totals($this->site, '2026-03-01', ['visitors' => 5, 'visits' => 6, 'pageviews' => 7]);
+    S::page($this->site, '2026-03-01', '/ended', ['pageviews' => 0, 'exits' => 6, 'entry_pageviews' => 7]);
 
     $series = $this->q->timeseries($this->site, d('2026-02-27'), d('2026-03-02'));
 
@@ -405,4 +414,56 @@ it('handles page rows that only carry engagement (a page view reported after mid
             'time_10' => 1.0, 'time_30' => 1.0, 'time_60' => 0.0, 'time_180' => 0.0,
             'scroll_25' => 1.0, 'scroll_50' => 0.0, 'scroll_75' => 0.0, 'scroll_100' => 0.0,
         ]]);
+});
+
+it('sums time on page and scroll depth into shares of the measured page views', function () {
+    S::page($this->site, '2026-03-01', '/a', ['pageviews' => 9, 'engaged_views' => 6, 'time_10' => 3, 'time_30' => 2, 'scroll_25' => 6, 'scroll_100' => 1]);
+    S::page($this->site, '2026-03-02', '/b', ['pageviews' => 5, 'engaged_views' => 2, 'time_10' => 1, 'scroll_25' => 2, 'scroll_50' => 1]);
+    S::page($this->site, '2026-03-03', '/c', ['pageviews' => 50, 'engaged_views' => 50, 'time_10' => 50]); // outside
+
+    expect($this->q->engagementTotals($this->site, d('2026-03-01'), d('2026-03-02')))->toBe([
+        'views' => 8, 'time_10' => 0.5, 'time_30' => 0.25, 'time_60' => 0.0, 'time_180' => 0.0,
+        'scroll_25' => 1.0, 'scroll_50' => 0.125, 'scroll_75' => 0.0, 'scroll_100' => 0.125,
+    ])->and($this->q->engagementTotals($this->site, d('2026-04-01'), d('2026-04-01'))['views'])->toBe(0);
+});
+
+it('gives the daily visitors per source type in a fixed type order', function () {
+    S::source($this->site, '2026-03-01', 'search', 'google.com', ['visits' => 2, 'visitors' => 2, 'pageviews' => 2]);
+    S::source($this->site, '2026-03-01', 'search', 'bing.com', ['visits' => 1, 'visitors' => 1, 'pageviews' => 1]);
+    S::source($this->site, '2026-03-02', 'direct', null, ['visits' => 4, 'visitors' => 3, 'pageviews' => 4]);
+    S::source($this->site, '2026-03-02', 'utm', 'news', ['visits' => 0, 'visitors' => 5, 'pageviews' => 5]); // imported, no visits
+
+    expect($this->q->sourceTypeSeries($this->site, d('2026-03-01'), d('2026-03-03')))->toBe([
+        'dates' => ['2026-03-01', '2026-03-02', '2026-03-03'],
+        'series' => ['utm' => [0, 5, 0], 'search' => [3, 0, 0], 'direct' => [0, 3, 0]],
+    ]);
+});
+
+it('gives the daily count of the most frequent custom events', function () {
+    S::event($this->site, '2026-03-01', 'custom', 'signup', null, '/a', 3);
+    S::event($this->site, '2026-03-02', 'custom', 'signup', null, '/b', 2);
+    S::event($this->site, '2026-03-02', 'custom', 'cta', null, '/a', 4);
+    S::event($this->site, '2026-03-02', 'custom', 'rare', null, '/a', 1);
+    S::event($this->site, '2026-03-02', 'outbound', 'outbound', 'https://x.example/', '/a', 9); // not a custom event
+
+    expect($this->q->eventSeries($this->site, d('2026-03-01'), d('2026-03-02'), 2))->toBe([
+        'dates' => ['2026-03-01', '2026-03-02'],
+        'series' => ['signup' => [3, 2], 'cta' => [0, 4]],
+    ]);
+});
+
+it('relates the custom events of a page to its page views', function () {
+    S::page($this->site, '2026-03-01', '/pricing', ['pageviews' => 40]);
+    S::page($this->site, '2026-03-02', '/pricing', ['pageviews' => 10]);
+    S::page($this->site, '2026-03-01', '/', ['pageviews' => 100]);
+    S::event($this->site, '2026-03-01', 'custom', 'cta.install', null, '/pricing', 5);
+    S::event($this->site, '2026-03-02', 'custom', 'cta.pricing', null, '/pricing', 5);
+    S::event($this->site, '2026-03-01', 'custom', 'cta.install', null, '/', 4);
+    S::event($this->site, '2026-03-01', 'custom', 'cta.install', null, '/no-views', 7); // no page views: no rate
+    S::event($this->site, '2026-03-01', 'outbound', 'outbound', 'https://x.example/', '/', 50);
+
+    expect($this->q->eventRates($this->site, d('2026-03-01'), d('2026-03-02')))->toBe([
+        ['path' => '/pricing', 'events' => 10, 'pageviews' => 50, 'rate' => 0.2],
+        ['path' => '/', 'events' => 4, 'pageviews' => 100, 'rate' => 0.04],
+    ]);
 });

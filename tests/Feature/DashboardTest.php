@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
+use N2ns\Stats\Http\View\Charts;
 use N2ns\Stats\Http\View\Dashboard;
 use N2ns\Stats\Http\View\LineChart;
 use N2ns\Stats\Models\Site;
@@ -78,8 +79,9 @@ it('renders the KPIs with deltas over complete days, the comparison basis and th
     S::totals($site, '2026-03-09', ['visitors' => 1234, 'visits' => 1500, 'pageviews' => 4500, 'bounces' => 600, 'duration_seconds' => 150000, 'events' => 40, 'outbound' => 12]);
     S::totals($site, '2026-03-10', ['visitors' => 10, 'visits' => 10, 'pageviews' => 30, 'events' => 2, 'outbound' => 1]); // today: in the totals, not in the deltas
     S::totals($site, '2026-03-02', ['visitors' => 617, 'visits' => 750, 'pageviews' => 900, 'events' => 20, 'outbound' => 6]);
-    S::page($site, '2026-03-09', '/pricing', ['pageviews' => 321, 'visitors' => 200]);
-    S::page($site, '2026-03-10', '/about', ['pageviews' => 3, 'visitors' => 3]);
+    S::page($site, '2026-03-09', '/pricing', ['pageviews' => 321, 'visitors' => 200, 'exits' => 1500, 'entry_pageviews' => 4500]);
+    S::page($site, '2026-03-10', '/about', ['pageviews' => 3, 'visitors' => 3, 'exits' => 10, 'entry_pageviews' => 30]);
+    S::page($site, '2026-03-02', '/old', ['pageviews' => 0, 'exits' => 750, 'entry_pageviews' => 900]);
     S::event($site, '2026-03-09', 'custom', 'signup', null, '/', 3, 3, '<b>hero</b>');
     S::visit($site, 'v1', now()->subMinute());
 
@@ -239,11 +241,59 @@ it('marks report tables as sortable with numeric sort values and ships the sorte
         ->assertSee('"Sort by %s"', false);
 });
 
-it('shows "No data" for reports without rows', function () {
+it('deals the cards of a tab out to a left and a right column after the wide charts', function () {
+    allowStats();
+    $site = S::site();
+    seedEveryReport($site);
+
+    $html = $this->get(route('stats.dashboard.site', ['publicId' => $site->public_id, 'range' => '7d']))->assertOk()->getContent();
+    preg_match('/<div role="tabpanel" class="tabpanel" id="panel-pages".*?(?=<div role="tabpanel"|<\/section>)/s', $html, $panel);
+    preg_match_all('/<div class="column">(.*?)<\/div>\n<\/div>\n(?=<div class="column">|<\/div>)/s', $panel[0], $columns);
+    $ids = fn (string $html): array => (preg_match_all('/<article class="card[^"]*" id="(?:chart|card)-([a-z_]+)"/', $html, $m) ? $m[1] : []);
+    $orders = fn (string $html): array => (preg_match_all('/<div class="cell" style="order:(\d+)">/', $html, $m) ? array_map('intval', $m[1]) : []);
+
+    // page_flow is wide: above the columns; then time_on_page, scroll_depth, content_groups and the reports alternate.
+    expect(strpos($panel[0], 'id="chart-page_flow"'))->toBeLessThan(strpos($panel[0], '<div class="columns">'))
+        ->and($columns[1])->toHaveCount(2)
+        ->and($ids($columns[1][0]))->toBe(['time_on_page', 'content_groups', 'entries', 'engagement', 'content'])
+        ->and($ids($columns[1][1]))->toBe(['scroll_depth', 'pages', 'exits', 'page_types', 'transitions'])
+        ->and($orders($columns[1][0]))->toBe([0, 2, 4, 6, 8])
+        ->and($orders($columns[1][1]))->toBe([1, 3, 5, 7, 9])
+        ->and($html)->toContain('.stats-dash .column{display:contents}'); // one column on narrow screens, in that order
+});
+
+it('draws the charts of every report tab', function () {
+    allowStats();
+    $site = S::site();
+    seedEveryReport($site);
+
+    $html = $this->get(route('stats.dashboard.site', ['publicId' => $site->public_id, 'range' => '7d']))->assertOk()->getContent();
+
+    foreach (array_merge(...array_values(Charts::TABS)) as $chart) {
+        expect($html)->toContain('id="chart-'.$chart.'"')->toContain(e(__('stats::dashboard.charts.'.$chart.'.title')));
+    }
+    expect($html)
+        ->toContain('Of 20 measured page views, the share that stayed at least this long.')
+        ->toContain('<div class="hbar-value">60.0%</div>')                                  // 12 of 20 stayed 30 s
+        ->toContain('<span class="lbl" title="Pricing page">Pricing page</span><span class="sub">Sales</span>')
+        ->toContain('<title>/pricing → /signup: 12</title>')
+        ->toContain('<span class="name">Search</span> 28')                                 // visitors by source type
+        ->toContain('<span class="lbl" title="Search · google.com">Search · google.com</span><span class="sub">30 visits</span>')
+        ->toContain('<title>DE: 20 visitors</title>')
+        ->toContain('<span class="name">signup</span> 7')                                  // daily count of the top events
+        ->toContain('<span class="lbl" title="/pricing">/pricing</span><span class="sub">5 events / 300 page views</span>')
+        ->toContain('<span class="lbl" title="gptbot">gptbot</span>')
+        ->toContain('<path class="prev"')                                                 // the previous period on the daily chart
+        ->toContain('Dashed: previous period')
+        ->toContain('aria-label="Browsers by Visitors')
+        ->toContain('aria-label="Operating systems by Visitors');
+});
+
+it('shows "No data" for reports and charts without rows', function () {
     allowStats();
     $site = S::site();
     $html = $this->get(route('stats.dashboard.site', ['publicId' => $site->public_id]))->assertOk()->getContent();
-    expect(substr_count($html, 'No data for this range.'))->toBe(count(StatsQuery::REPORTS));
+    expect(substr_count($html, 'No data for this range.'))->toBe(count(StatsQuery::REPORTS) + count(array_merge(...array_values(Charts::TABS))));
 });
 
 it('supports every preset range and custom ranges', function (array $query, string $shown) {
@@ -448,7 +498,7 @@ it('puts every column of wide reports into a details view', function () {
         ->toContain('<td class="num" data-value="60">1m 00s</td>')              // 1200 s over 20 measured views
         ->toContain('<td class="num" data-value="0.6">60.0%</td>')               // 12 of 20 views stayed 30 s
         ->and(substr_count($card[0], '<th scope="col"'))->toBe(3 + count(StatsQuery::COLUMNS['engagement']) + 1)
-        ->and($html)->toContain('.cards>.card:has(details[open]){grid-column:1/-1}');
+        ->and($card[0])->toContain('<div class="table-scroll">');                // scrolls sideways inside its column
 
     expect(Dashboard::layout('engagement'))->toBe(['label' => 'path', 'sub' => ['title'], 'metric' => 'engaged_views', 'details' => true])
         ->and(Dashboard::layout('exits')['details'])->toBeFalse()
@@ -503,12 +553,13 @@ it('ships light and dark design tokens, focus styles and reduced motion', functi
     expect($html)->toContain('<meta name="color-scheme" content="light dark">')
         ->toContain('<body class="stats-dash">')
         ->toContain('.stats-dash{')
-        ->toContain('--bg:#f5f6f8;--surface:#ffffff;')
+        ->toContain('--bg:#fafafa;--surface:#ffffff;')                // Filament's light zinc
         ->toContain('@media (prefers-color-scheme:dark){.stats-dash:not(.stats-filament){')
-        ->toContain('--bg:#0e1014;--surface:#171a20;')
+        ->toContain('--bg:#09090b;--surface:#18181b;')                // and dark zinc
+        ->toContain('--accent:var(--primary-600,#d97706)')            // inside a panel: its primary colour
         ->toContain('font-variant-numeric:tabular-nums')
         ->toContain('.stats-dash :focus-visible{outline:2px solid var(--accent)')
         ->toContain('@media (prefers-reduced-motion:reduce)')
         ->and(substr_count($html, '--text:'))->toBe(3)   // light, dark media query, Filament .dark
-        ->and(substr_count($html, '--accent:'))->toBe(3);
+        ->and(substr_count($html, '--accent:'))->toBe(4); // and the panel's primary colour inside Filament
 });

@@ -4,6 +4,7 @@ namespace N2ns\Stats\Filament\Widgets\Report;
 
 use Filament\Widgets\ChartWidget;
 use N2ns\Stats\Filament\Selection;
+use N2ns\Stats\Http\View\Dashboard;
 use N2ns\Stats\Reports\StatsQuery;
 
 /** Line chart of the daily visitors, visits, pageviews, events and outbound clicks of the selected range. */
@@ -42,10 +43,18 @@ class TrafficChart extends ChartWidget
             return [];
         }
 
-        return self::lines(
-            app(StatsQuery::class)->timeseries($selection->site, $selection->period->from, $selection->period->to),
-            array_combine(self::METRICS, array_map(fn (string $metric): string => (string) __('stats::filament.metrics.'.$metric), self::METRICS)),
-        );
+        $stats = app(StatsQuery::class);
+        $labels = array_combine(self::METRICS, array_map(fn (string $metric): string => (string) __('stats::filament.metrics.'.$metric), self::METRICS));
+        $data = self::lines($stats->timeseries($selection->site, $selection->period->from, $selection->period->to), $labels);
+
+        // The same metrics over the days just before, dashed and hidden until their legend entry is clicked.
+        [$from, $to] = Dashboard::previousRange($selection->period->from, $selection->period->to);
+        $previous = self::lines($stats->timeseries($selection->site, $from, $to), $labels)['datasets'];
+        foreach ($previous as $dataset) {
+            $data['datasets'][] = ['label' => __('stats::filament.chart.previous', ['metric' => $dataset['label']]), 'borderDash' => [5, 4], 'hidden' => true] + $dataset;
+        }
+
+        return $data;
     }
 
     /**

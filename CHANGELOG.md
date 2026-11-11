@@ -6,8 +6,31 @@ All notable changes to N2N Stats are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-11-11
+
+### Added
+
+- Charts in every report tab, in the dashboard and on the Filament page: time on page and scroll
+  depth of all pages, content groups and page flow; daily visitors per source type and the bounce
+  rate of the top sources; a world map of visitors per country; the daily count of the top custom
+  events and the events per page view by page; AI fetchers. Browsers and operating systems also get
+  a donut chart.
+- The daily traffic chart shows the same number of days before: a dashed line in the dashboard, and
+  lines hidden in the legend until clicked on the Filament page.
+
+### Changed
+
+- The dashboard looks like a default Filament panel (zinc grays, amber accent, Filament-style cards,
+  tabs, tables and controls); inside a Filament panel the charts use the panel's primary colour.
+- The cards of the statistics page (both) have a tinted title bar and a shadow.
+- The cards of a report tab alternate between two columns that stack their cards, so shorter cards no
+  longer leave gaps; on narrow screens they form one column in the same order. Wide tables of a card
+  scroll sideways inside its column.
+
 ### Fixed
 
+- Views per visit are the page views of the ended visits over the ended visits, so a day with page
+  views from before counting began (such as the day imported history ends) no longer inflates them.
 - Opening a site from the Filament Sites list (its name, View or Edit) showed 404: the list linked by the
   sequential id while the pages look sites up by public id. Sites are now addressed by public id everywhere.
 
@@ -106,6 +129,7 @@ All notable changes to N2N Stats are listed here. The format follows
 - Commands `stats:install`, `stats:site`, `stats:token` and `stats:maintain` (scheduled every five
   minutes); configurable retention of aggregates.
 
+[0.1.4]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.4
 [0.1.3]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.3
 [0.1.2]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.2
 [0.1.1]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.1

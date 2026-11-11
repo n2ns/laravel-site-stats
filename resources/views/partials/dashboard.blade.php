@@ -78,7 +78,7 @@
 @endforeach
 </section>
 
-@include('stats::partials.chart', ['series' => $series, 'metrics' => Dashboard::CHART_METRICS, 'title' => __('stats::dashboard.chart.title'), 'id' => 'chart'])
+@include('stats::partials.chart', ['series' => $series, 'previous' => $previousSeries, 'metrics' => Dashboard::CHART_METRICS, 'title' => __('stats::dashboard.chart.title'), 'id' => 'chart'])
 
 <section aria-label="{{ __('stats::dashboard.reports') }}">
 <div class="tabs" role="tablist" aria-label="{{ __('stats::dashboard.reports') }}" hidden>
@@ -97,9 +97,30 @@
 </div>
 @include('stats::partials.chart', ['series' => $ai['series'], 'metrics' => Dashboard::AI_CHART_METRICS, 'title' => __('stats::dashboard.ai.chart'), 'id' => 'ai-chart'])
 @endif
-<div class="cards">
-@foreach ($names as $name)
-@include('stats::partials.report', ['name' => $name, 'rows' => $reports[$name], 'total' => $totals[$name]])
+@php
+    // Wide charts across the tab first; then the other charts and the reports alternately in a left and a right
+    // column that each stack their cards (no row alignment, so no gaps under shorter cards). 'order' keeps the
+    // original order when the columns collapse into one on narrow screens.
+    $tabCharts = $charts[$tab] ?? [];
+    $cards = [...array_filter($tabCharts, fn ($c) => ! $c['wide']), ...$names];
+@endphp
+@foreach (array_filter($tabCharts, fn ($c) => $c['wide']) as $chart)
+@include('stats::partials.chart-card', ['chart' => $chart])
+@endforeach
+<div class="columns">
+@foreach ([0, 1] as $column)
+<div class="column">
+@foreach ($cards as $i => $card)
+@continue($i % 2 !== $column)
+<div class="cell" style="order:{{ $i }}">
+@if (is_array($card))
+@include('stats::partials.chart-card', ['chart' => $card])
+@else
+@include('stats::partials.report', ['name' => $card, 'rows' => $reports[$card], 'total' => $totals[$card]])
+@endif
+</div>
+@endforeach
+</div>
 @endforeach
 </div>
 </div>

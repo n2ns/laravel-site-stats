@@ -27,6 +27,10 @@ vendor/bin/phpstan analyse --memory-limit=1G
 
 CI also runs the PHP tests on MySQL and PostgreSQL, with PHP 8.3 and 8.4 and Laravel 12 and 13.
 
+The world map's country shapes (`resources/data/world-map.json`) are generated; the commands and the
+sources are at the top of `scripts/build-world-map.php`, their licences in
+`resources/data/world-map.LICENSES.txt`.
+
 ## Pull requests
 
 - Add or update tests for every change in behaviour.

@@ -57,6 +57,7 @@ return [
     'realtime_note' => '最近 5 分钟内活跃的访问',
 
     'chart' => [
+        'previous' => '虚线：上一时段',
         'title' => '每日流量',
         'aria' => '每日:metrics折线图；下方数据表列出了具体数值。',
         'table' => '数据表',
@@ -101,5 +102,17 @@ return [
     'show_all' => '显示全部 :count 行',
     'show_top' => '只显示前 :count 行',
     'details' => '全部列',
+    'charts' => [
+        'time_on_page' => ['title' => '页面停留时长分布', 'description' => '在有测量的 :views 次浏览中，停留达到各时长的比例。'],
+        'scroll_depth' => ['title' => '滚动深度分布', 'description' => '在有测量的 :views 次浏览中，滚动达到各深度的比例。'],
+        'content_groups' => ['title' => '内容分组浏览量', 'description' => '浏览量最多的内容分组（同一内容的各语言版本合计）。'],
+        'page_flow' => ['title' => '页面流向', 'description' => '访客从哪个页面去了哪个页面：左边是来自的页面，右边是前往的页面，色带越粗次数越多。'],
+        'source_trend' => ['title' => '各来源类型的每日访客', 'description' => '每天的访客按来源类型堆叠。'],
+        'source_bounce' => ['title' => '各来源的跳出率', 'description' => '访问次数最多的来源的跳出率（没有访问记录的来源不计）。', 'visits' => ':count 次访问'],
+        'world_map' => ['title' => '访客地图', 'description' => '各国家/地区的访客，颜色越深访客越多（最多 :max）；指向国家可看具体数字。', 'visitors' => ':count 位访客', 'fewer' => '少', 'more' => '多', 'unmapped' => '另有 :count 位访客的国家/地区未能在地图上显示。'],
+        'event_trend' => ['title' => '主要事件的每日次数', 'description' => '次数最多的自定义事件每天发生的次数。'],
+        'event_rates' => ['title' => '各页面的事件率', 'description' => '自定义事件最多的页面：每次浏览平均触发的事件数（事件数 ÷ 浏览量）。', 'counts' => ':events 次事件 / :pageviews 次浏览'],
+        'ai_fetchers' => ['title' => 'AI 抓取方', 'description' => '抓取页面次数最多的 AI 爬虫和 AI 助手。'],
+    ],
     'details_table' => '“:title”的全部列',
 ];

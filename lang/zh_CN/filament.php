@@ -52,6 +52,7 @@ return [
     'chart' => [
         'traffic' => '每日流量',
         'ai' => '每日 AI 访问与抓取',
+        'previous' => '上一时段:metric',
     ],
     'metrics' => [
         'visitors' => '访客',

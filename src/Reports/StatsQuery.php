@@ -7,6 +7,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use N2ns\Stats\Models\Site;
+use N2ns\Stats\Support\Source;
 use N2ns\Stats\Support\Tables;
 
 /**
@@ -102,7 +103,7 @@ class StatsQuery
         }
         $pagesByDate = [];
         $pageRows = $this->range('daily_pages', $site, $from, $to)->select('date')
-            ->selectRaw('SUM(CASE WHEN pageviews > 0 THEN 1 ELSE 0 END) AS pages, SUM(engaged_views) AS engaged_views, SUM(engaged_seconds) AS engaged_seconds')
+            ->selectRaw('SUM(CASE WHEN pageviews > 0 THEN 1 ELSE 0 END) AS pages, SUM(engaged_views) AS engaged_views, SUM(engaged_seconds) AS engaged_seconds, SUM(exits) AS ended, SUM(entry_pageviews) AS ended_pageviews')
             ->groupBy('date')->get();
         foreach ($pageRows as $row) {
             $pagesByDate[substr((string) $row->date, 0, 10)] = $row;
@@ -123,7 +124,7 @@ class StatsQuery
                 'events' => (int) ($row->events ?? 0),
                 'outbound' => (int) ($row->outbound ?? 0),
                 'pages' => (int) ($pages->pages ?? 0),
-                'views_per_visit' => $visits > 0 ? round($pageviews / $visits, 2) : 0.0,
+                'views_per_visit' => (int) ($pages->ended ?? 0) > 0 ? round((int) ($pages->ended_pageviews ?? 0) / (int) $pages->ended, 2) : 0.0,
                 'bounce_rate' => $visits > 0 ? round((int) ($row->bounces ?? 0) / $visits, 4) : 0.0,
                 'avg_duration_seconds' => intdiv((int) ($row->duration_seconds ?? 0), max($visits, 1)),
                 'avg_page_seconds' => $engagedViews > 0 ? intdiv((int) ($pages->engaged_seconds ?? 0), $engagedViews) : 0,
@@ -166,6 +167,103 @@ class StatsQuery
         }
 
         return $result;
+    }
+
+    /**
+     * Time on page and scroll depth of the whole range: the page views that reported them and the share of those that
+     * reached each threshold.
+     *
+     * @return array{views: int, time_10: float, time_30: float, time_60: float, time_180: float, scroll_25: float, scroll_50: float, scroll_75: float, scroll_100: float}
+     */
+    public function engagementTotals(Site $site, CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        $thresholds = ['time_10', 'time_30', 'time_60', 'time_180', 'scroll_25', 'scroll_50', 'scroll_75', 'scroll_100'];
+        $row = $this->range('daily_pages', $site, $from, $to)
+            ->selectRaw(implode(', ', array_map(fn (string $c): string => "SUM({$c}) AS {$c}", ['engaged_views', ...$thresholds])))->first();
+        $views = (int) ($row->engaged_views ?? 0);
+        $out = ['views' => $views];
+        foreach ($thresholds as $column) {
+            $out[$column] = $views > 0 ? round((int) ($row->{$column} ?? 0) / $views, 4) : 0.0;
+        }
+
+        /** @var array{views: int, time_10: float, time_30: float, time_60: float, time_180: float, scroll_25: float, scroll_50: float, scroll_75: float, scroll_100: float} */
+        return $out;
+    }
+
+    /**
+     * Daily visitors per source type (the types with visitors in the range, in Source::TYPES order).
+     *
+     * @return array{dates: list<string>, series: array<string, list<int>>}
+     */
+    public function sourceTypeSeries(Site $site, CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        $rows = $this->range('daily_sources', $site, $from, $to)->select('date', 'source_type')
+            ->selectRaw('SUM(visitors) AS visitors')->groupBy('date', 'source_type')->get();
+        $values = [];
+        foreach ($rows as $row) {
+            $values[(string) $row->source_type][substr((string) $row->date, 0, 10)] = (int) $row->visitors;
+        }
+
+        return $this->daily($from, $to, array_intersect_key(array_replace(array_fill_keys(Source::TYPES, null), $values), $values));
+    }
+
+    /**
+     * Daily count of the custom events with the highest count in the range.
+     *
+     * @return array{dates: list<string>, series: array<string, list<int>>}
+     */
+    public function eventSeries(Site $site, CarbonImmutable $from, CarbonImmutable $to, int $top = 5): array
+    {
+        $names = $this->range('daily_events', $site, $from, $to)->where('kind', 'custom')->select('name')
+            ->groupBy('name')->orderByRaw('SUM(count) DESC')->orderBy('name')->limit($top)->pluck('name')->map(fn ($n): string => (string) $n)->all();
+        $values = array_fill_keys($names, []);
+        if ($names !== []) {
+            $rows = $this->range('daily_events', $site, $from, $to)->where('kind', 'custom')->whereIn('name', $names)
+                ->select('date', 'name')->selectRaw('SUM(count) AS count')->groupBy('date', 'name')->get();
+            foreach ($rows as $row) {
+                $values[(string) $row->name][substr((string) $row->date, 0, 10)] = (int) $row->count;
+            }
+        }
+
+        return $this->daily($from, $to, $values);
+    }
+
+    /**
+     * The pages with the most custom events, with their page views and the events per page view.
+     *
+     * @return list<array{path: string, events: int, pageviews: int, rate: float}>
+     */
+    public function eventRates(Site $site, CarbonImmutable $from, CarbonImmutable $to, int $limit = 10): array
+    {
+        $events = $this->range('daily_events', $site, $from, $to)->where('kind', 'custom')->whereNotNull('path')
+            ->select('path_hash')->selectRaw('MAX(path) AS path, SUM(count) AS events')
+            ->groupBy('path_hash')->orderByRaw('SUM(count) DESC')->orderBy('path_hash')->limit($limit)->get();
+        $views = $this->range('daily_pages', $site, $from, $to)->whereIn('path_hash', $events->pluck('path_hash')->all())
+            ->select('path_hash')->selectRaw('SUM(pageviews) AS pageviews')->groupBy('path_hash')->pluck('pageviews', 'path_hash');
+        $rows = [];
+        foreach ($events as $row) {
+            $pageviews = (int) ($views[$row->path_hash] ?? 0);
+            if ($pageviews > 0) {
+                $rows[] = ['path' => (string) $row->path, 'events' => (int) $row->events, 'pageviews' => $pageviews, 'rate' => round((int) $row->events / $pageviews, 4)];
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param  array<string, array<string, int>|null>  $values  series => date => value
+     * @return array{dates: list<string>, series: array<string, list<int>>}
+     */
+    private function daily(CarbonImmutable $from, CarbonImmutable $to, array $values): array
+    {
+        $dates = $this->days($from, $to);
+        $series = [];
+        foreach ($values as $name => $byDate) {
+            $series[(string) $name] = array_map(fn (string $date): int => $byDate[$date] ?? 0, $dates);
+        }
+
+        return ['dates' => $dates, 'series' => $series];
     }
 
     /**
@@ -406,10 +504,14 @@ class StatsQuery
     private function totals(Site $site, CarbonImmutable $from, CarbonImmutable $to): array
     {
         $row = $this->range('daily_totals', $site, $from, $to)
-            ->selectRaw('SUM(visitors) AS visitors, SUM(visits) AS visits, SUM(pageviews) AS pageviews, SUM(bounces) AS bounces, SUM(duration_seconds) AS duration_seconds, SUM(events) AS events, SUM(outbound) AS outbound, SUM(CASE WHEN visits > 0 THEN pageviews ELSE 0 END) AS visit_pageviews')
+            ->selectRaw('SUM(visitors) AS visitors, SUM(visits) AS visits, SUM(pageviews) AS pageviews, SUM(bounces) AS bounces, SUM(duration_seconds) AS duration_seconds, SUM(events) AS events, SUM(outbound) AS outbound')
             ->first();
         $pages = $this->range('daily_pages', $site, $from, $to)->where('pageviews', '>', 0)->distinct()->count('path_hash');
-        $engaged = $this->range('daily_pages', $site, $from, $to)->selectRaw('SUM(engaged_views) AS v, SUM(engaged_seconds) AS s')->first();
+        // Ended visits (one exit each) and their page views (added to their entry page): only visits recorded here, so
+        // days with page views but no visit data (imported history, or the part of a day before counting began) are left out.
+        $engaged = $this->range('daily_pages', $site, $from, $to)
+            ->selectRaw('SUM(engaged_views) AS v, SUM(engaged_seconds) AS s, SUM(exits) AS ended, SUM(entry_pageviews) AS ended_pageviews')->first();
+        $ended = (int) ($engaged->ended ?? 0);
         $engagedViews = (int) ($engaged->v ?? 0);
 
         $visits = (int) ($row->visits ?? 0);
@@ -420,8 +522,7 @@ class StatsQuery
             'visits' => $visits,
             'pageviews' => $pageviews,
             'pages' => $pages,
-            // Days without visit data (such as imported history) do not count towards views per visit.
-            'views_per_visit' => $visits > 0 ? round((int) ($row->visit_pageviews ?? 0) / $visits, 2) : 0.0,
+            'views_per_visit' => $ended > 0 ? round((int) ($engaged->ended_pageviews ?? 0) / $ended, 2) : 0.0,
             'bounce_rate' => $visits > 0 ? round((int) ($row->bounces ?? 0) / $visits, 4) : 0.0,
             'avg_duration_seconds' => intdiv((int) ($row->duration_seconds ?? 0), max($visits, 1)),
             'avg_page_seconds' => $engagedViews > 0 ? intdiv((int) ($engaged->s ?? 0), $engagedViews) : 0,

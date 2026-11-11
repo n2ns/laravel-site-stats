@@ -58,6 +58,7 @@ return [
     'realtime_note' => 'visits active in the last 5 min',
 
     'chart' => [
+        'previous' => 'Dashed: previous period',
         'title' => 'Daily traffic',
         'aria' => 'Line chart of daily :metrics; the data table below lists the values.',
         'table' => 'Data table',
@@ -102,5 +103,17 @@ return [
     'show_all' => 'Show all :count',
     'show_top' => 'Show top :count',
     'details' => 'All columns',
+    'charts' => [
+        'time_on_page' => ['title' => 'Time on page', 'description' => 'Of :views measured page views, the share that stayed at least this long.'],
+        'scroll_depth' => ['title' => 'Scroll depth', 'description' => 'Of :views measured page views, the share that scrolled at least this far.'],
+        'content_groups' => ['title' => 'Content groups', 'description' => 'The content groups with the most page views (all language versions of a piece together).'],
+        'page_flow' => ['title' => 'Page flow', 'description' => 'Where visitors went from page to page: pages moved from on the left, pages moved to on the right; thicker bands are more moves.'],
+        'source_trend' => ['title' => 'Visitors by source type', 'description' => 'Each day\'s visitors, stacked by source type.'],
+        'source_bounce' => ['title' => 'Bounce rate by source', 'description' => 'The bounce rate of the sources with the most visits (sources without recorded visits are left out).', 'visits' => ':count visits'],
+        'world_map' => ['title' => 'Visitor map', 'description' => 'Visitors per country; darker is more (at most :max). Point at a country for its number.', 'visitors' => ':count visitors', 'fewer' => 'Fewer', 'more' => 'More', 'unmapped' => ':count more visitors came from countries the map cannot show.'],
+        'event_trend' => ['title' => 'Top events per day', 'description' => 'Daily count of the custom events that happened most often.'],
+        'event_rates' => ['title' => 'Event rate by page', 'description' => 'The pages with the most custom events: events per page view (events ÷ page views).', 'counts' => ':events events / :pageviews page views'],
+        'ai_fetchers' => ['title' => 'AI fetchers', 'description' => 'The AI crawlers and assistants that fetched the most pages.'],
+    ],
     'details_table' => ':title, all columns',
 ];

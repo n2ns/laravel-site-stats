@@ -52,6 +52,7 @@ return [
     'chart' => [
         'traffic' => 'Daily traffic',
         'ai' => 'Daily AI visits and fetches',
+        'previous' => ':metric, previous period',
     ],
     'metrics' => [
         'visitors' => 'Visitors',

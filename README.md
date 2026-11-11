@@ -315,8 +315,8 @@ Open `/stats` (the `dashboard_path`) on your app's domain (unless `dashboard_ena
 apps that use the [Filament](#filament) pages instead). It is plain server-rendered Blade with
 inline SVG charts and a little plain JavaScript: no front-end build, no CDN, no external fonts. The
 interface is in English and Simplified Chinese and follows your app's locale (`zh_CN` shows Chinese).
-It has a light and a dark theme that follow the system setting, works down to phone width, and
-respects reduced motion.
+It looks like a default Filament panel (zinc grays, amber accent), has a light and a dark theme that
+follow the system setting, works down to phone width, and respects reduced motion.
 
 - Site switcher (with more than one site) and date ranges (today, yesterday, 7, 15, 30 and 90 days, this month, last month,
   custom). Changes are computed over complete days: a range that includes today compares its days up
@@ -327,26 +327,32 @@ respects reduced motion.
   online now (visits with activity in the last 5 minutes) below them. Each figure shows its change
   (a lower bounce rate counts as better) and a small trend line of its daily values. A
   daily chart shows one of visitors, visits, page views, events and outbound clicks at a time, with
-  each day's values on hover or with the arrow keys, and its data table.
+  the same days before as a dashed line, each day's values on hover or with the arrow keys, and its
+  data table.
 - **Pages:** pages with title and type, entry pages with the page views, outbound clicks and events
   of the visits that started there, exit pages, time on page and scroll depth (average time and the
   share of page views that stayed at least 10 s, 30 s, 1 min, 3 min and scrolled 25%, 50%, 75%, to the
-  end), page types, content groups, and moves from page to page.
+  end), page types, content groups, and moves from page to page; charts of the time on page and
+  scroll depth of all pages, the content groups and the page flow (the most frequent moves).
 - **Sources:** source types and sources (with page views, outbound clicks and events), UTM campaigns,
-  and landing pages by source, by campaign and by search engine.
+  and landing pages by source, by campaign and by search engine; charts of the daily visitors per
+  source type and of the bounce rate of the sources with the most visits.
 - **Visitors:** countries, devices, browsers, operating systems, browser languages and site languages,
-  with visits, visitors and page views.
+  with visits, visitors and page views; a world map of the visitors per country.
 - **Events:** custom events with label and target, outbound links and downloads with label, every
   event with the page it happened on, and events per site language version (for sites with
-  site languages).
+  site languages); charts of the daily count of the top custom events and of the custom events per
+  page view of the pages with the most of them.
 - **AI:** visits and visitors referred by AI assistants and AI fetches with a daily chart, AI referrals,
   the pages AI assistants send visitors to, AI fetchers (crawler or user-triggered, with the number of
-  pages fetched) and the pages they fetched.
+  pages fetched, also as a chart) and the pages they fetched.
 - Each report is a card with its main column, main figure and each row's share (reports of visits use
   their visitors, which imported days without visit data also have; a rate without visits shows –): the top 10 rows,
   with "show all" for the top 50. Reports with more columns have an "All columns" view with the full
   table. Tables can be sorted by any column and exported as CSV (up to 500 rows); source types,
-  countries, devices, site languages and page types also have a donut chart.
+  countries, devices, browsers, operating systems, site languages and page types also have a donut
+  chart. The wide charts span the tab; the other charts and reports alternate between two columns
+  that stack their cards (one column, in the same order, on narrow screens).
 - Site management: add sites, edit domains, timezone, site languages, excluded paths and public
   counts, show and copy the embed snippet, reset the server key (shown once).
 
@@ -360,11 +366,13 @@ use N2ns\Stats\Filament\StatsPlugin;
 $panel->plugin(StatsPlugin::make()->navigationGroup('Analytics')->navigationLabel('Statistics'));
 ```
 
-It adds, built from native Filament components so they follow your panel's colours and dark mode:
+It adds, built from native Filament components (the tab charts are the dashboard's inline SVG in
+Filament sections) so they follow your panel's colours and dark mode:
 
 - a statistics page: site (with more than one site) and range filters kept in the URL, the key figures with their change over
-  complete days and daily sparklines, the daily traffic chart, and the reports in tabs (pages,
-  sources, visitors, events, AI) as sortable, searchable, paginated tables with CSV export and
+  complete days and daily sparklines, the daily traffic chart (the previous period's lines are in its
+  legend, hidden until clicked), and the reports in tabs (pages, sources, visitors, events, AI) with
+  the same charts as the dashboard, as sortable, searchable, paginated tables with CSV export and
   doughnut charts;
 - a Sites resource to create, edit and delete sites (deleting removes their statistics too), copy
   the embed code and generate a server key for client mode; leave it out with
@@ -499,6 +507,8 @@ All tables use the `table_prefix`. Daily tables are bucketed by the site's timez
   (in that order: an AI assistant's own `utm_source` alone, such as ChatGPT's `utm_source=chatgpt.com`;
   UTM; AI, search, social, click id, other referrer; direct). Referrals from the site itself count as
   direct.
+- **Views per visit:** page views of the visits that ended / visits that ended, so page views without
+  visit data (imported history) are left out.
 - **Bounce:** a visit that ended with exactly one page view. Bounce rate = bounces / visits; a source
   without visits (such as imported history) has no bounce rate (`null` in the API).
 - **Events:** outbound clicks, downloads and custom events (AI fetches are counted separately). An

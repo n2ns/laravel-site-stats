@@ -59,7 +59,8 @@ it('returns the summary with the complete-day comparison', function () {
     apiToken();
     S::totals($this->site, '2026-03-02', ['visitors' => 4, 'visits' => 5, 'pageviews' => 10, 'bounces' => 1, 'duration_seconds' => 100, 'outbound' => 3]);
     S::totals($this->site, '2026-03-01', ['visitors' => 2, 'visits' => 2, 'pageviews' => 2]);
-    S::page($this->site, '2026-03-02', '/a', ['pageviews' => 10]);
+    S::page($this->site, '2026-03-02', '/a', ['pageviews' => 10, 'exits' => 5, 'entry_pageviews' => 10]);
+    S::page($this->site, '2026-03-01', '/ended', ['pageviews' => 0, 'exits' => 2, 'entry_pageviews' => 2]);
 
     $current = ['visitors' => 4, 'visits' => 5, 'pageviews' => 10, 'pages' => 1, 'views_per_visit' => 2.0, 'bounce_rate' => 0.2, 'avg_duration_seconds' => 20, 'avg_page_seconds' => 0, 'events' => 0, 'outbound' => 3];
     $this->getJson('/api/v1/sites/'.$this->site->public_id.'/summary?from=2026-03-02&to=2026-03-02', $this->auth)

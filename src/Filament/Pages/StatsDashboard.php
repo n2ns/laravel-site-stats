@@ -12,12 +12,14 @@ use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\EmptyState;
 use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Livewire;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\Text;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
@@ -30,7 +32,9 @@ use N2ns\Stats\Filament\Widgets\Report\AiKpis;
 use N2ns\Stats\Filament\Widgets\Report\Kpis;
 use N2ns\Stats\Filament\Widgets\Report\ReportChart;
 use N2ns\Stats\Filament\Widgets\Report\ReportTable;
+use N2ns\Stats\Filament\Widgets\Report\TabChart;
 use N2ns\Stats\Filament\Widgets\Report\TrafficChart;
+use N2ns\Stats\Http\View\Charts;
 use N2ns\Stats\Http\View\Dashboard;
 use N2ns\Stats\Reports\Period;
 use UnitEnum;
@@ -132,17 +136,36 @@ class StatsDashboard extends Page
         [$current, $previous] = $selection->period->comparison($today);
         $tabs = [];
         foreach (Dashboard::TABS as $tab => $reports) {
-            $widgets = $tab === 'ai' ? [$this->widget(AiKpis::class, 'ai-kpis'), $this->widget(AiChart::class, 'ai-chart')] : [];
+            // Wide widgets across the tab first; then the others alternately in a left and a right column that each
+            // stack their widgets (no row alignment, so no gaps under shorter cards). 'order' keeps the original
+            // order when the columns collapse into one on narrow screens (partials.styles).
+            $wide = $tab === 'ai' ? [$this->widget(AiKpis::class, 'ai-kpis'), $this->widget(AiChart::class, 'ai-chart')] : [];
+            $cells = [];
+            foreach (Charts::TABS[$tab] as $chart) {
+                $widget = $this->widget(TabChart::class, 'tab-chart-'.$chart, ['chart' => $chart]);
+                in_array($chart, Charts::WIDE, true) ? $wide[] = $widget : $cells[] = $widget;
+            }
             foreach (array_intersect(Dashboard::DONUTS, $reports) as $report) {
-                $widgets[] = $this->widget(ReportChart::class, 'chart-'.$report, ['report' => $report]);
+                $cells[] = $this->widget(ReportChart::class, 'chart-'.$report, ['report' => $report]);
             }
             foreach ($reports as $report) {
-                $widgets[] = $this->widget(ReportTable::class, 'table-'.$report, ['report' => $report]);
+                $cells[] = $this->widget(ReportTable::class, 'table-'.$report, ['report' => $report]);
             }
-            $tabs[] = Tab::make(__('stats::filament.tabs.'.$tab))->id($tab)->schema([Grid::make(['lg' => 2])->schema($widgets)]);
+            $columns = [[], []];
+            foreach ($cells as $i => $cell) {
+                $columns[$i % 2][] = $cell->extraAttributes(['class' => 'stats-cell', 'style' => 'order:'.$i]);
+            }
+            $tabs[] = Tab::make(__('stats::filament.tabs.'.$tab))->id($tab)->schema([
+                ...$wide,
+                Grid::make(['lg' => 2])->extraAttributes(['class' => 'stats-columns'])->schema([
+                    Group::make($columns[0])->extraAttributes(['class' => 'stats-column']),
+                    Group::make($columns[1])->extraAttributes(['class' => 'stats-column']),
+                ]),
+            ]);
         }
 
         return [
+            View::make('stats::partials.styles'), // the inline SVG charts of the report tabs (TabChart)
             EmbeddedSchema::make('filtersForm'),
             Callout::make(__('stats::filament.range_error'))
                 ->description($selection->error)
