@@ -141,7 +141,7 @@ Per site, day and table, at most `max_new_rows_per_day` (default 5000) new aggre
 
 ### 5.5 Dimensions
 
-- Country: the `CF-IPCountry` request header (two upper-case letters, excluding `XX` and `T1`), otherwise `unknown`. No external geolocation service is called.
+- Country: the request header named by `country_header` (default `CF-IPCountry`; two upper-case letters, excluding `XX` and `T1`); when it gives none, a lookup of the IP address in the local MaxMind DB file `country_database` (its `country.iso_code`, the same check); otherwise `unknown`. The database is opened once per request; a file that cannot be read logs a warning and leaves the country `unknown` without losing the event. No external geolocation service is called.
 - Device, browser, OS: lightweight built-in User-Agent rules (no external library). Devices are desktop, mobile and tablet; the screen width `w` is only used to tell tablets from phones (600–1100 px counts as a tablet).
 - Language: the primary subtag of the first `Accept-Language` entry (e.g. `en`, `zh`); `unknown` if it is not 2–3 letters.
 - Site language (`locale`): for sites with `locales`, the first path segment when it is one of them, otherwise `default_locale` (or `(default)`). Sites without `locales` have no such dimension.
@@ -204,7 +204,7 @@ mode, table_prefix, collector_domain, collector_path, dashboard_enabled (true), 
 
 ## 10. Privacy statement
 
-No cookies and no browser storage; IP addresses and User-Agent strings are not stored (in client mode, server-side page views forward them to the host, which uses them only to compute the hash); the visitor hash uses a random daily salt that is deleted within 48 hours after the day ends, so visitors cannot be linked across days or sites; country comes from a CDN request header; only daily aggregate counts are stored. The data stays on the site owner's own server and is not sent to third parties. `PRIVACY.md` has the full list and a paragraph for privacy policies.
+No cookies and no browser storage; IP addresses and User-Agent strings are not stored (in client mode, server-side page views forward them to the host, which uses them only to compute the hash); the visitor hash uses a random daily salt that is deleted within 48 hours after the day ends, so visitors cannot be linked across days or sites; country comes from a CDN request header or a local country database; only daily aggregate counts are stored. The data stays on the site owner's own server and is not sent to third parties. `PRIVACY.md` has the full list and a paragraph for privacy policies.
 
 ## 11. Testing and quality
 

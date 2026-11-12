@@ -26,7 +26,7 @@ final readonly class Client
         return new self(
             (string) $request->ip(),
             (string) $request->userAgent(),
-            $request->headers->get('CF-IPCountry'),
+            $request->headers->get((string) config('stats.country_header')),
             $request->headers->get('Accept-Language'),
             is_string($origin) && $origin !== '' && $origin !== 'null' ? $origin : null,
         );

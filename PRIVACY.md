@@ -18,7 +18,9 @@ For each page view or event, the tracking script sends one request with:
   percent.
 
 The request itself also carries the visitor's IP address, User-Agent, `Accept-Language` header
-and, behind Cloudflare, the `CF-IPCountry` header.
+and, behind Cloudflare or another CDN, a header with the visitor's country. Without such a header, the
+country can be looked up from the IP address in a country database file on the statistics server;
+the IP address is not sent anywhere for this.
 
 Sites can instead count page views and some events on their own server. Then the same
 information comes from the request to the site itself; when that site is not the one that stores the
@@ -65,7 +67,7 @@ Only daily counts per site:
   with visits, visitors, page views, bounces, outbound clicks and events;
 - per entry page and source: visits and visitors;
 - per move from one page path to another within a visit: the count and the number of visitors;
-- per country (two-letter code from the CDN header, or `unknown`), device class, browser,
+- per country (two-letter code from the CDN header or the local country database, or `unknown`), device class, browser,
   operating system, language (primary tag of `Accept-Language`, such as `en`) and the site's
   language version of the page: visits, visitors and page views;
 - per outbound link, download, custom event and AI fetcher: the name, the label, the target without
@@ -96,14 +98,15 @@ the counts of requested custom events can be read by anyone; they contain no vis
 
 ## Example paragraph for a privacy policy
 
-Adapt this to your setup (for example, remove the country sentence if you do not use Cloudflare):
+Adapt this to your setup (for example, change the country sentence to how you find the country, or remove it):
 
 > We use N2N Stats, a self-hosted analytics tool, to count visits to this website. It does not use
 > cookies or store anything in your browser. When you open a page, your IP address and browser
 > identification are combined with a random value that changes every day into a one-way hash, which
 > lets us count unique visitors per day; neither your IP address nor your browser identification is
 > stored, and the daily value is deleted within two days, so you cannot be recognised on another day
-> or on other websites. Your country is taken from a header added by our CDN, Cloudflare. We keep
-> only daily totals, such as how many people visited a page, which website or campaign referred
-> them, and their country, device type, browser, operating system and language. The data is stored
+> or on other websites. Your country is taken from a header added by our CDN, Cloudflare (or: looked
+> up from your IP address in a database on our own server). We keep only daily totals, such as how
+> many people visited a page, which website or campaign referred them, and their country, device
+> type, browser, operating system and language. The data is stored
 > on our own servers and is not shared with third parties.

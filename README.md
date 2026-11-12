@@ -21,7 +21,8 @@ on page and AI fetches, and stores **only daily aggregates**.
   statistics in its own admin; or let one installation count many websites with one line of script
   each (they do not have to be Laravel apps). Both work in the same installation.
 - **Self-hosted, no third parties.** Data stays on your server. Country comes from your CDN's
-  request header; no IP address is ever sent to a geolocation service.
+  request header or from a country database file on your own server; no IP address is ever sent to
+  a geolocation service.
 
 ### What is and isn't collected
 
@@ -29,7 +30,7 @@ on page and AI fetches, and stores **only daily aggregates**.
 | --- | --- |
 | Page path (without query string or fragment), page title, page type and content group | IP addresses |
 | Referrer host, UTM parameters, source type | Full User-Agent strings |
-| Country (from the `CF-IPCountry` header) | Cookies or any browser storage |
+| Country (from a CDN header or a local country database) | Cookies or any browser storage |
 | Device class, browser, operating system, browser language, site language version | Individual page views or sessions |
 | Outbound link, download and event targets (without query string) | Identifiers that last longer than a day |
 | Custom event names and labels; moves between pages within a visit | Anything about a visitor across days or sites |
@@ -71,11 +72,20 @@ and prints the next steps. The app that stores the data runs in **host mode** (t
    * * * * * cd /path-to-your-app && php artisan schedule:run >> /dev/null 2>&1
    ```
 
-3. **Country and visitor IP.** The country is read from the `CF-IPCountry` request header, so put the
-   site (or the collector domain) behind Cloudflare with the proxy enabled, or another CDN that sends
-   this header; without it every visit has the country `unknown`. Behind a proxy or CDN, configure
-   Laravel's trusted proxies so that `$request->ip()` is the visitor's address: it is only used for the
-   daily hash and rate limits, but if all requests seem to come from the proxy, all visitors become one.
+3. **Country and visitor IP.** The country is read from the `CF-IPCountry` request header, so with the
+   site (or the collector domain) behind Cloudflare with the proxy enabled there is nothing to do.
+   Another CDN, or your web server, may send the country in another header: name it in
+   `STATS_COUNTRY_HEADER` (e.g. `CloudFront-Viewer-Country`). Without such a header, point
+   `STATS_COUNTRY_DATABASE` to a local country database in the MaxMind DB format (`.mmdb`), such as
+   the free [DB-IP IP to Country Lite](https://db-ip.com/db/download/ip-to-country-lite) or
+   [MaxMind GeoLite2 Country](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data), and
+   replace the file with each new release (both are updated monthly or more often; check the terms of
+   the one you choose, DB-IP Lite asks for a link to DB-IP.com where its results are shown). The
+   database is used when the header gives no country; it is read on your server and the IP address is
+   not sent anywhere. With neither, every visit has the country `unknown`. Behind a proxy or CDN,
+   configure Laravel's trusted proxies so that `$request->ip()` is the visitor's address: it is only
+   used for the daily hash, the country lookup and rate limits, but if all requests seem to come from
+   the proxy, all visitors become one.
 
 Then set up one or both of the following.
 
@@ -479,6 +489,8 @@ Publish the file with `php artisan vendor:publish --tag=stats-config`. Main opti
 | `dashboard_layout` | | `null` | Host admin layout for the dashboard and site pages: `['view' => …, 'section' => …, 'title_sections' => […], 'sections' => […]]` or `['component' => …]`; standalone when null |
 | `dashboard_back_url` | `STATS_DASHBOARD_BACK_URL` | `null` | Address of a back link at the top of the dashboard and site pages |
 | `dashboard_back_label` | | `null` | Text of the back link (the translated "Back" when null) |
+| `country_header` | `STATS_COUNTRY_HEADER` | `CF-IPCountry` | Request header with the visitor's two-letter country code |
+| `country_database` | `STATS_COUNTRY_DATABASE` | none | Path of a local `.mmdb` country database, used when the header gives no country |
 | `host_site` | `STATS_HOST_SITE` | none | Host mode: public id of the app's own site, used by the middleware, `Stats::event()` and `@statsScript` (which prints a tag only on that site's domains); none = found by the `Host` header |
 | `visit_timeout_minutes` | | `30` | Idle time that ends a visit |
 | `retention_days` | `STATS_RETENTION_DAYS` | none | Days to keep daily aggregates; none = forever |

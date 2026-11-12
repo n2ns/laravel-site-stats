@@ -15,12 +15,15 @@ use N2ns\Stats\Console\InstallCommand;
 use N2ns\Stats\Console\MaintainCommand;
 use N2ns\Stats\Console\SiteCommand;
 use N2ns\Stats\Console\TokenCommand;
+use N2ns\Stats\Support\CountryLookup;
 
 class StatsServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/stats.php', 'stats');
+        // One open country database per request (or per Octane request), not one per event.
+        $this->app->scoped(CountryLookup::class);
     }
 
     public function boot(): void

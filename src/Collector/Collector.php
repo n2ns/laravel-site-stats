@@ -10,6 +10,7 @@ use N2ns\Stats\Models\Site;
 use N2ns\Stats\Recording\Page;
 use N2ns\Stats\Recording\Recorder;
 use N2ns\Stats\Support\BotDetector;
+use N2ns\Stats\Support\CountryLookup;
 use N2ns\Stats\Support\PathNormalizer;
 use N2ns\Stats\Support\SourceClassifier;
 use N2ns\Stats\Support\UserAgentParser;
@@ -26,6 +27,7 @@ class Collector
         private readonly PathNormalizer $paths,
         private readonly SourceClassifier $sources,
         private readonly UserAgentParser $userAgents,
+        private readonly CountryLookup $countries,
     ) {}
 
     public function collect(Payload $payload, Request $request): void
@@ -157,10 +159,8 @@ class Collector
     /** @return array{country: string, device: string, browser: string, os: string, language: string} */
     private function dimensions(Client $client, string $userAgent, ?int $width): array
     {
-        $country = trim((string) $client->country);
-        if (preg_match('/^[A-Z]{2}$/', $country) !== 1 || in_array($country, ['XX', 'T1'], true)) {
-            $country = 'unknown';
-        }
+        // The country header (from the CDN or the web server) first, then the local country database.
+        $country = self::country($client->country) ?? self::country($this->countries->country($client->ip)) ?? 'unknown';
 
         $first = explode(',', (string) $client->acceptLanguage)[0];
         $language = strtolower(trim((preg_split('/[-_;]/', $first) ?: [''])[0]));
@@ -171,5 +171,13 @@ class Collector
         $ua = $this->userAgents->parse($userAgent, $width);
 
         return ['country' => $country, 'device' => $ua['device'], 'browser' => $ua['browser'], 'os' => $ua['os'], 'language' => $language];
+    }
+
+    /** A two-letter country code; null for anything else and for the unknown (XX) and Tor (T1) codes. */
+    private static function country(?string $code): ?string
+    {
+        $code = trim((string) $code);
+
+        return preg_match('/^[A-Z]{2}$/', $code) === 1 && ! in_array($code, ['XX', 'T1'], true) ? $code : null;
     }
 }

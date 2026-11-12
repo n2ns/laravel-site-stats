@@ -85,7 +85,7 @@ class ServerTracker
             return;
         }
 
-        $client = new Client((string) $request->ip(), $userAgent, $request->headers->get('CF-IPCountry'), $request->headers->get('Accept-Language'));
+        $client = new Client((string) $request->ip(), $userAgent, $request->headers->get((string) config('stats.country_header')), $request->headers->get('Accept-Language'));
         $this->collector->collectFrom($payload, $client);
     }
 
@@ -107,7 +107,7 @@ class ServerTracker
             ->post(rtrim($endpoint, '/').'/api/server-event', ['site' => $site, 'kind' => $kind] + $fields + [
                 'ip' => (string) $request->ip(),
                 'user_agent' => mb_substr($userAgent, 0, 512),
-                'country' => self::cut($request->headers->get('CF-IPCountry'), 16),
+                'country' => self::cut($request->headers->get((string) config('stats.country_header')), 16),
                 'accept_language' => self::cut($request->headers->get('Accept-Language'), 256),
             ]);
     }

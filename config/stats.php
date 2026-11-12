@@ -48,6 +48,15 @@ return [
     */
     'host_site' => env('STATS_HOST_SITE'),
 
+    /*
+    | The visitor's country: first the two-letter code in country_header, added by a CDN (Cloudflare: CF-IPCountry,
+    | Amazon CloudFront: CloudFront-Viewer-Country) or by the web server; when that gives none, a lookup of the IP
+    | address in country_database, the path of a local MaxMind DB country file (.mmdb, e.g. DB-IP IP to Country Lite
+    | or MaxMind GeoLite2 Country) that you keep up to date. Without either, the country is 'unknown'.
+    */
+    'country_header' => env('STATS_COUNTRY_HEADER', 'CF-IPCountry'),
+    'country_database' => env('STATS_COUNTRY_DATABASE'),
+
     'visit_timeout_minutes' => 30,
 
     // Days to keep daily aggregates; null keeps them forever.

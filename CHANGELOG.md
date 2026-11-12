@@ -6,6 +6,13 @@ All notable changes to N2N Stats are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The country can come from another request header (`country_header`, e.g. `CloudFront-Viewer-Country` or one set by
+  the web server) and, when the header gives none, from a local country database file in the MaxMind DB format
+  (`country_database`, e.g. DB-IP IP to Country Lite or MaxMind GeoLite2 Country), so sites that are not behind
+  Cloudflare get countries too. The lookup runs on the statistics server.
+
 ## [0.1.8] - 2026-11-12
 
 ### Added
