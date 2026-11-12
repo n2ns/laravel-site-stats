@@ -6,6 +6,8 @@ All notable changes to N2N Stats are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-11-13
+
 ### Added
 
 - The country can come from another request header (`country_header`, e.g. `CloudFront-Viewer-Country` or one set by
@@ -187,6 +189,7 @@ All notable changes to N2N Stats are listed here. The format follows
 - Commands `stats:install`, `stats:site`, `stats:token` and `stats:maintain` (scheduled every five
   minutes); configurable retention of aggregates.
 
+[0.1.9]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.9
 [0.1.8]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.8
 [0.1.7]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.7
 [0.1.6]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.6
