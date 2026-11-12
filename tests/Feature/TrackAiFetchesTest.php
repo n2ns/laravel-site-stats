@@ -30,6 +30,15 @@ it('records ai fetches of the matching site in host mode', function () {
         ->and([$events[1]->name, $events[1]->path])->toBe(['gptbot', '/moved']);
 });
 
+it('does not record ai fetches of excluded paths', function () {
+    $this->site->update(['exclude_paths' => ['/moved', '/docs/*']]);
+
+    $this->get('https://example.com/docs/page', ['User-Agent' => GPTBOT_UA])->assertOk();
+    $this->get('https://example.com/moved', ['User-Agent' => GPTBOT_UA])->assertRedirect();
+
+    expect(DB::table('stats_daily_events')->count())->toBe(0);
+});
+
 it('uses the pinned host site instead of the Host header', function () {
     $other = Site::create(['name' => 'Other', 'domains' => ['other.org']]);
     config(['stats.host_site' => $other->public_id]);

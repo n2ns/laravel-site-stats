@@ -98,6 +98,13 @@ it('drops forwarded pageviews the collector rejects', function (array $override)
     'empty user agent' => [['user_agent' => '']],
 ]);
 
+it('drops forwarded ai fetches of excluded paths', function () {
+    $this->site->update(['exclude_paths' => ['/admin*']]);
+    serverEvent(['site' => $this->site->public_id, 'kind' => 'ai_fetch', 'name' => 'gptbot', 'path' => '/admin/users'])->assertNoContent();
+
+    expect(DB::table('stats_daily_events')->count())->toBe(0);
+});
+
 it('drops forwarded pageviews of excluded paths', function () {
     $this->site->update(['exclude_paths' => ['/admin*']]);
     serverEvent(['site' => $this->site->public_id, 'kind' => 'pageview', 'url' => 'https://client.com/admin/users'] + VISITOR)->assertNoContent();

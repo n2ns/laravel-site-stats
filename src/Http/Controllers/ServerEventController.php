@@ -53,6 +53,9 @@ class ServerEventController
             if (! is_string($name) || preg_match('/^[a-z0-9_.-]{1,64}$/', $name) !== 1 || $path === null) {
                 return new Response('', 400);
             }
+            if ($site->excludesPath($path)) {
+                return new Response('', 204);
+            }
             // AI fetches have no visitor, so they get a per-site limit of their own.
             $limiter = 'stats-server-event:'.$site->id;
             if (RateLimiter::tooManyAttempts($limiter, (int) config('stats.rate_limits.server_events_per_minute', 600))) {

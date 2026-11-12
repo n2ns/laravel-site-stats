@@ -59,7 +59,7 @@ class TrackAiFetches
     private function record(string $host, string $fetcher, string $path): void
     {
         $site = Site::forHost($host);
-        if ($site === null) {
+        if ($site === null || $site->excludesPath($path)) {
             return;
         }
 

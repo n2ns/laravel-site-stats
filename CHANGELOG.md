@@ -6,6 +6,11 @@ All notable changes to N2N Stats are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- AI fetches of a site's excluded paths are no longer counted, by the `TrackAiFetches` middleware and when a
+  client app forwards them; excluded paths now apply to every way of sending, as documented.
+
 ## [0.1.9] - 2026-11-13
 
 ### Added
