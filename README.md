@@ -5,6 +5,11 @@ Laravel app to count that site in its own database and admin, or run one Laravel
 number of websites. It collects page views, sources, outbound clicks, downloads, custom events, time
 on page and AI fetches, and stores **only daily aggregates**.
 
+[![Packagist version](https://img.shields.io/packagist/v/n2ns/laravel-site-stats)](https://packagist.org/packages/n2ns/laravel-site-stats)
+[![Packagist downloads](https://img.shields.io/packagist/dt/n2ns/laravel-site-stats)](https://packagist.org/packages/n2ns/laravel-site-stats)
+[![CI](https://img.shields.io/github/actions/workflow/status/n2ns/laravel-site-stats/ci.yml?branch=main&label=CI)](https://github.com/n2ns/laravel-site-stats/actions/workflows/ci.yml)
+[![license](https://img.shields.io/github/license/n2ns/laravel-site-stats)](https://github.com/n2ns/laravel-site-stats/blob/main/LICENSE)
+
 `n2ns/laravel-site-stats` is made by [Datafrog LLC](https://datafrog.io) as part of
 [N2NS Lab](https://n2ns.com).
 
