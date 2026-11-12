@@ -367,13 +367,15 @@ follow the system setting, works down to phone width, and respects reduced motio
   excluded paths and public counts, show and copy the embed snippet, reset the server key (shown once).
 
 The pages are standalone by default. To show them inside your own Blade admin, with its menu around
-them, set `dashboard_layout` to a layout to extend or to a layout component (there they keep the
-light theme):
+them, set `dashboard_layout` to a layout to extend or to a layout component. There they keep the
+light theme, unless your admin follows the system's light or dark theme: then add `'theme' => 'system'`
+and they follow it too:
 
 ```php
 // config/stats.php
 'dashboard_layout' => ['view' => 'admin.layout', 'section' => 'content', 'title_sections' => ['title'],
-    'sections' => ['page-title' => 'Analytics']],   // optional: fixed text for other sections of the layout
+    'sections' => ['page-title' => 'Analytics'],   // optional: fixed text for other sections of the layout
+    'theme' => 'system'],                           // optional: follow prefers-color-scheme like the layout
 // or: 'dashboard_layout' => ['component' => 'layouts.app'],   // page in its slot, title in its title attribute
 'dashboard_back_url' => '/admin',   // a "Back" link at the top of the pages
 ```
@@ -486,7 +488,7 @@ Publish the file with `php artisan vendor:publish --tag=stats-config`. Main opti
 | `dashboard_enabled` | `STATS_DASHBOARD_ENABLED` | `true` | Serve the standalone dashboard and site management pages; turn off when the host shows the statistics in its own admin (Filament plugin) |
 | `dashboard_path` | `STATS_DASHBOARD_PATH` | `stats` | Dashboard route prefix |
 | `dashboard_middleware` | | `['web']` | Middleware of the dashboard routes (the `viewStats` gate is always applied) |
-| `dashboard_layout` | | `null` | Host admin layout for the dashboard and site pages: `['view' => …, 'section' => …, 'title_sections' => […], 'sections' => […]]` or `['component' => …]`; standalone when null |
+| `dashboard_layout` | | `null` | Host admin layout for the dashboard and site pages: `['view' => …, 'section' => …, 'title_sections' => […], 'sections' => […]]` or `['component' => …]`, either with `'theme' => 'system'` when the layout follows the system theme; standalone when null |
 | `dashboard_back_url` | `STATS_DASHBOARD_BACK_URL` | `null` | Address of a back link at the top of the dashboard and site pages |
 | `dashboard_back_label` | | `null` | Text of the back link (the translated "Back" when null) |
 | `country_header` | `STATS_COUNTRY_HEADER` | `CF-IPCountry` | Request header with the visitor's two-letter country code |

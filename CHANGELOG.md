@@ -6,6 +6,11 @@ All notable changes to N2N Stats are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `dashboard_layout` takes `'theme' => 'system'` for host layouts that follow the system's light or dark theme: the
+  pages inside follow it too, instead of keeping the light theme (whose dark text was unreadable on a dark admin).
+
 ## [0.1.10] - 2026-11-13
 
 ### Fixed

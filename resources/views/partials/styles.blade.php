@@ -1,6 +1,7 @@
 <style>
 /* Design tokens, after Filament's default look (zinc grays, amber primary; Tailwind's palette): light theme by
-   default, dark theme from prefers-color-scheme (not inside a host's admin layout, .stats-embedded); inside a
+   default, dark theme from prefers-color-scheme (inside a host's admin layout, .stats-embedded, only when the layout
+   follows the system theme, .stats-theme-system: most admin layouts stay light); inside a
    Filament panel (.stats-filament) its own primary colour and .dark class. */
 .stats-dash{
   color-scheme:light;
@@ -17,7 +18,7 @@
   --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   color:var(--text);font:var(--fs-md)/1.5 var(--font);-webkit-text-size-adjust:100%;
 }
-@media (prefers-color-scheme:dark){.stats-dash:not(.stats-filament):not(.stats-embedded){
+@media (prefers-color-scheme:dark){.stats-dash:not(.stats-filament):not(.stats-embedded),.stats-dash.stats-embedded.stats-theme-system{
   color-scheme:dark;
   --bg:#09090b;--surface:#18181b;--surface-2:rgba(255,255,255,.04);--text:#fafafa;--text-2:#d4d4d8;--muted:#a1a1aa;
   --border:rgba(255,255,255,.10);--border-strong:rgba(255,255,255,.20);--accent:#fbbf24;--accent-hover:#fcd34d;--on-accent:#09090b;

@@ -64,3 +64,17 @@ it('fills fixed text into other sections of the host layout', function () {
         ->assertSee('<title>Alpha - Host admin</title>', false)
         ->assertSee('<h1 class="host-title">Analytics</h1>', false);
 });
+
+it('keeps the light theme in a host layout unless the layout follows the system theme', function () {
+    config(['stats.dashboard_layout' => ['view' => 'host-admin', 'section' => 'body']]);
+    $site = S::site('Alpha');
+
+    $this->get('/stats/sites/'.$site->public_id)->assertOk()
+        ->assertSee('<div class="stats-dash stats-embedded">', false);
+
+    config(['stats.dashboard_layout' => ['view' => 'host-admin', 'section' => 'body', 'theme' => 'system']]);
+    $this->get('/stats/sites/'.$site->public_id)->assertOk()
+        ->assertSee('<div class="stats-dash stats-embedded stats-theme-system">', false)
+        ->assertSee('.stats-dash.stats-embedded.stats-theme-system{', false);
+    $this->get('/stats/manage/sites')->assertOk()->assertSee('stats-embedded stats-theme-system', false);
+});
