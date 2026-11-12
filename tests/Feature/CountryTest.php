@@ -7,9 +7,10 @@ use N2ns\Stats\Models\Site;
 const COUNTRY_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
 
 /** Sends a pageview from $ip with extra server variables and returns the country it was counted under. */
-function countedCountry(string $ip, array $server = []): ?string
+function countedCountry(string $ip, array $server = []): string
 {
-    $site = Site::query()->sole();
+    $site = Site::query()->where('name', 'Example')->sole();
+    DB::table('stats_visits')->delete();
     test()->call('POST', '/api/event', [], [], [], array_merge([
         'CONTENT_TYPE' => 'text/plain;charset=UTF-8',
         'HTTP_ORIGIN' => 'https://example.com',
@@ -17,8 +18,7 @@ function countedCountry(string $ip, array $server = []): ?string
         'REMOTE_ADDR' => $ip,
     ], $server), json_encode(['s' => $site->public_id, 't' => 'pageview', 'u' => 'https://example.com/a']))->assertNoContent();
 
-    return DB::table('stats_visits')->latest('started_at')->get()
-        ->map(fn ($visit) => json_decode((string) $visit->dimensions, true)['country'])->last();
+    return json_decode((string) DB::table('stats_visits')->sole()->dimensions, true)['country'];
 }
 
 beforeEach(function () {
@@ -33,7 +33,6 @@ it('looks the country up in the local database when there is no country header',
 
 it('prefers the country header and falls back to the database for an unknown code', function () {
     expect(countedCountry('198.51.100.7', ['HTTP_CF_IPCOUNTRY' => 'DE']))->toBe('DE');
-    DB::table('stats_visits')->delete();
     expect(countedCountry('198.51.100.8', ['HTTP_CF_IPCOUNTRY' => 'XX']))->toBe('FR');
 });
 
@@ -45,7 +44,6 @@ it('reads the configured country header', function () {
 
 it('counts unknown for addresses the database has no country for', function () {
     expect(countedCountry('192.0.2.1'))->toBe('unknown');
-    DB::table('stats_visits')->delete();
     expect(countedCountry('203.0.113.5'))->toBe('unknown');
 });
 
