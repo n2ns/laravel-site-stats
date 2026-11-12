@@ -14,24 +14,24 @@
     $metricLabel = Dashboard::header($name, $metric);
     $top = Dashboard::TOP_ROWS;
 @endphp
-<article class="card report" id="card-{{ $name }}">
-<div class="card-head">
+<article class="stats-card stats-report" id="card-{{ $name }}">
+<div class="stats-card-head">
 <h3 id="report-{{ $name }}">{{ $title }}</h3>
 @if ($rows !== [])
 <a href="{{ route('stats.dashboard.export', ['publicId' => $site->public_id, 'report' => $name] + $query) }}" aria-label="{{ __('stats::dashboard.csv_label', ['title' => $title]) }}">{{ __('stats::dashboard.csv') }}</a>
 @endif
 </div>
 @if ($rows === [])
-<p class="empty">{{ __('stats::dashboard.no_data') }}</p>
+<p class="stats-empty">{{ __('stats::dashboard.no_data') }}</p>
 @else
 @if (in_array($name, Dashboard::DONUTS, true))
 @include('stats::partials.donut', ['slices' => Dashboard::donut($name, $rows, $total), 'label' => __('stats::dashboard.donut', ['title' => $title, 'metric' => $metricLabel])])
 @endif
-<table class="compact" aria-labelledby="report-{{ $name }}" data-sortable data-top="{{ $top }}">
+<table class="stats-compact" aria-labelledby="report-{{ $name }}" data-sortable data-top="{{ $top }}">
 <thead><tr>
 <th scope="col">{{ Dashboard::header($name, $layout['label']) }}</th>
-<th scope="col" class="num">{{ $metricLabel }}</th>
-<th scope="col" class="num" title="{{ __('stats::dashboard.share_of', ['metric' => $metricLabel]) }}">{{ __('stats::dashboard.share') }}</th>
+<th scope="col" class="stats-num">{{ $metricLabel }}</th>
+<th scope="col" class="stats-num" title="{{ __('stats::dashboard.share_of', ['metric' => $metricLabel]) }}">{{ __('stats::dashboard.share') }}</th>
 </tr></thead>
 <tbody>
 @foreach ($rows as $row)
@@ -39,29 +39,29 @@
     $share = $total > 0 ? (int) $row[$metric] / $total : 0.0;
     $sub = array_values(array_filter(array_map(fn ($c) => $row[$c] === null || $row[$c] === '' ? null : Dashboard::cell($name, $c, $row[$c]), $layout['sub']), fn ($t) => $t !== null));
 @endphp
-<tr @class(['more' => $loop->index >= $top])>
-<td class="key"><div class="bar-row"><span class="fill" style="width:{{ round($share * 100, 1) }}%" aria-hidden="true"></span><span class="lbl">{{ Dashboard::cell($name, $layout['label'], $row[$layout['label']]) }}</span>@if ($sub !== [])<span class="sub">{{ implode(' · ', $sub) }}</span>@endif</div></td>
-<td class="num" data-value="{{ $row[$metric] }}">{{ Dashboard::cell($name, $metric, $row[$metric]) }}</td>
-<td class="num" data-value="{{ round($share, 6) }}">{{ Format::percent($share) }}</td>
+<tr @class(['stats-more' => $loop->index >= $top])>
+<td class="stats-key"><div class="stats-bar-row"><span class="stats-fill" style="width:{{ round($share * 100, 1) }}%" aria-hidden="true"></span><span class="stats-lbl">{{ Dashboard::cell($name, $layout['label'], $row[$layout['label']]) }}</span>@if ($sub !== [])<span class="stats-sub">{{ implode(' · ', $sub) }}</span>@endif</div></td>
+<td class="stats-num" data-value="{{ $row[$metric] }}">{{ Dashboard::cell($name, $metric, $row[$metric]) }}</td>
+<td class="stats-num" data-value="{{ round($share, 6) }}">{{ Format::percent($share) }}</td>
 </tr>
 @endforeach
 </tbody>
 </table>
 @if (count($rows) > $top || $layout['details'])
-<div class="card-foot">
+<div class="stats-card-foot">
 @if (count($rows) > $top)
-<button type="button" class="link more-toggle" aria-expanded="false" data-more="{{ __('stats::dashboard.show_all', ['count' => count($rows)]) }}" data-less="{{ __('stats::dashboard.show_top', ['count' => $top]) }}" hidden>{{ __('stats::dashboard.show_all', ['count' => count($rows)]) }}</button>
+<button type="button" class="stats-link stats-more-toggle" aria-expanded="false" data-more="{{ __('stats::dashboard.show_all', ['count' => count($rows)]) }}" data-less="{{ __('stats::dashboard.show_top', ['count' => $top]) }}" hidden>{{ __('stats::dashboard.show_all', ['count' => count($rows)]) }}</button>
 @endif
 @if ($layout['details'])
-<details class="details">
+<details class="stats-details">
 <summary>{{ __('stats::dashboard.details') }}</summary>
-<div class="table-scroll">
+<div class="stats-table-scroll">
 <table aria-label="{{ __('stats::dashboard.details_table', ['title' => $title]) }}" data-sortable>
 <thead><tr>
 @foreach ($columns as $c)
-<th scope="col" class="{{ Dashboard::isText($c) ? '' : 'num' }}">{{ Dashboard::header($name, $c) }}</th>
+<th scope="col" class="{{ Dashboard::isText($c) ? '' : 'stats-num' }}">{{ Dashboard::header($name, $c) }}</th>
 @endforeach
-<th scope="col" class="num" title="{{ __('stats::dashboard.share_of', ['metric' => $metricLabel]) }}">{{ __('stats::dashboard.share') }}</th>
+<th scope="col" class="stats-num" title="{{ __('stats::dashboard.share_of', ['metric' => $metricLabel]) }}">{{ __('stats::dashboard.share') }}</th>
 </tr></thead>
 <tbody>
 @foreach ($rows as $row)
@@ -69,12 +69,12 @@
 <tr>
 @foreach ($columns as $c)
 @if (Dashboard::isText($c))
-<td class="key">{{ Dashboard::cell($name, $c, $row[$c]) }}</td>
+<td class="stats-key">{{ Dashboard::cell($name, $c, $row[$c]) }}</td>
 @else
-<td class="num" data-value="{{ $row[$c] }}">{{ Dashboard::cell($name, $c, $row[$c]) }}</td>
+<td class="stats-num" data-value="{{ $row[$c] }}">{{ Dashboard::cell($name, $c, $row[$c]) }}</td>
 @endif
 @endforeach
-<td class="num" data-value="{{ round($share, 6) }}">{{ Format::percent($share) }}</td>
+<td class="stats-num" data-value="{{ round($share, 6) }}">{{ Format::percent($share) }}</td>
 </tr>
 @endforeach
 </tbody>

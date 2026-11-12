@@ -6,6 +6,12 @@ All notable changes to N2N Stats are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Every CSS class of the dashboard and site pages starts with `stats-`, so a host admin's own styles with generic
+  class names (`.main`, `.card`, `.grid`, `.toolbar`, …) no longer change the pages shown inside its layout, such as
+  the main navigation turning into a column.
+
 ## [0.1.11] - 2026-11-13
 
 ### Added

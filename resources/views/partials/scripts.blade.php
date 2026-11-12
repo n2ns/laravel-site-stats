@@ -2,7 +2,7 @@
 (function () {
   var root = document.querySelector('.stats-dash');
   if (!root) return;
-  root.classList.add('js');
+  root.classList.add('stats-js');
   var each = function (selector, fn) { Array.prototype.forEach.call(root.querySelectorAll(selector), fn); };
 
   each('form[data-autosubmit] select', function (s) {
@@ -42,14 +42,14 @@
   // Compact report tables show their top rows; "show all" reveals the rest (without JS every row shows).
   var markTop = function (table) {
     var top = parseInt(table.getAttribute('data-top'), 10);
-    Array.prototype.forEach.call(table.tBodies[0].rows, function (row, i) { row.classList.toggle('more', i >= top); });
+    Array.prototype.forEach.call(table.tBodies[0].rows, function (row, i) { row.classList.toggle('stats-more', i >= top); });
   };
-  each('.report .more-toggle', function (button) {
-    var card = button.closest('.report');
+  each('.stats-report .stats-more-toggle', function (button) {
+    var card = button.closest('.stats-report');
     button.hidden = false;
     button.addEventListener('click', function () {
-      var open = !card.classList.contains('expanded');
-      card.classList.toggle('expanded', open);
+      var open = !card.classList.contains('stats-expanded');
+      card.classList.toggle('stats-expanded', open);
       button.setAttribute('aria-expanded', open ? 'true' : 'false');
       button.textContent = button.getAttribute(open ? 'data-less' : 'data-more');
     });
@@ -62,7 +62,7 @@
     headers.forEach(function (th, col) {
       var button = document.createElement('button');
       button.type = 'button';
-      button.className = 'sort';
+      button.className = 'stats-sort';
       button.textContent = th.textContent;
       button.setAttribute('aria-label', sortLabel.replace('%s', th.textContent));
       th.textContent = '';
@@ -92,13 +92,13 @@
 
   // Chart tooltips: pointer hover, or focus the plot and use the arrow keys (Home, End, Escape).
   var number = new Intl.NumberFormat('en-US');
-  each('.chart[data-chart]', function (chart) {
+  each('.stats-chart[data-chart]', function (chart) {
     var data = JSON.parse(chart.getAttribute('data-chart'));
     var count = data.dates.length;
-    var plot = chart.querySelector('.plot'), tip = plot.querySelector('.tip'), guide = plot.querySelector('.guide'), dot = plot.querySelector('.dot');
+    var plot = chart.querySelector('.stats-plot'), tip = plot.querySelector('.stats-tip'), guide = plot.querySelector('.stats-guide'), dot = plot.querySelector('.stats-dot');
     if (!count) return;
     var index = count - 1;
-    var selected = function () { var r = chart.querySelector('.metric-radio:checked'); return r ? r.value : Object.keys(data.metrics)[0]; };
+    var selected = function () { var r = chart.querySelector('.stats-metric-radio:checked'); return r ? r.value : Object.keys(data.metrics)[0]; };
     var x = function (i) { return count > 1 ? i / (count - 1) * 100 : 50; };
     var render = function (i) {
       index = i;
@@ -109,14 +109,14 @@
       dot.style.top = (100 - m.values[i] / m.top * 100) + '%';
       tip.textContent = '';
       var day = document.createElement('div');
-      day.className = 'day';
+      day.className = 'stats-day';
       day.textContent = data.dates[i];
       var dl = document.createElement('dl');
       Object.keys(data.metrics).forEach(function (key) {
         var dt = document.createElement('dt'), dd = document.createElement('dd');
         dt.textContent = data.metrics[key].label;
         dd.textContent = number.format(data.metrics[key].values[i]);
-        if (key === metric) { dt.className = 'on'; dd.className = 'on'; }
+        if (key === metric) { dt.className = 'stats-on'; dd.className = 'stats-on'; }
         dl.appendChild(dt); dl.appendChild(dd);
       });
       tip.appendChild(day);
@@ -144,7 +144,7 @@
       e.preventDefault();
       render(Math.min(count - 1, Math.max(0, next)));
     });
-    Array.prototype.forEach.call(chart.querySelectorAll('.metric-radio'), function (radio) {
+    Array.prototype.forEach.call(chart.querySelectorAll('.stats-metric-radio'), function (radio) {
       radio.addEventListener('change', function () { if (!tip.hidden) render(index); });
     });
   });

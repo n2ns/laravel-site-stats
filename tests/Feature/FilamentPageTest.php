@@ -154,7 +154,7 @@ it('draws the charts of the report tabs with the shared inline SVG', function ()
 
     // The page includes the styles of the charts.
     $this->get('/admin/stats?filters[site]='.$site->public_id.'&filters[range]=7d')->assertOk()
-        ->assertSee('.stats-dash .hbars', false);
+        ->assertSee('.stats-dash .stats-hbars', false);
 });
 
 it('deals the widgets of a tab out to a left and a right column after the wide ones', function () {

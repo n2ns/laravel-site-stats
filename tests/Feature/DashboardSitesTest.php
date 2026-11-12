@@ -189,18 +189,18 @@ it('lays out each site as a card with a copyable snippet and labelled fields wit
 
     $this->get(route('stats.sites.index'))
         ->assertOk()
-        ->assertSee('<section class="card site-card" aria-labelledby="site-'.$site->public_id.'">', false)
-        ->assertSee('<button type="button" class="secondary" data-copy hidden>Copy</button>', false)
+        ->assertSee('<section class="stats-card stats-site-card" aria-labelledby="site-'.$site->public_id.'">', false)
+        ->assertSee('<button type="button" class="stats-secondary" data-copy hidden>Copy</button>', false)
         ->assertSee('navigator.clipboard.writeText', false)
         ->assertSee('<label for="domains-new">Domains</label>', false)
         ->assertSee('aria-describedby="domains-help-new"', false)
-        ->assertSee('<p class="help" id="domains-help-new">Domains, one per line', false)
+        ->assertSee('<p class="stats-help" id="domains-help-new">Domains, one per line', false)
         ->assertSee('<a href="'.route('stats.sites.index').'" aria-current="page">Site settings</a>', false);
 });
 
 it('folds the new site form unless there is no site yet or it was sent with errors', function () {
     $open = function (): bool {
-        preg_match('/<details class="card new-site" id="new-site"[^>]*>/', $this->get('/stats/manage/sites')->assertOk()->getContent(), $tag);
+        preg_match('/<details class="stats-card stats-new-site" id="new-site"[^>]*>/', $this->get('/stats/manage/sites')->assertOk()->getContent(), $tag);
 
         return str_contains($tag[0], ' open');
     };

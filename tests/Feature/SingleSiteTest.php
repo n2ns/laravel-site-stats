@@ -50,7 +50,7 @@ it('shows no site switcher when there is a single site', function () {
 
     $this->get(route('stats.dashboard.site', ['publicId' => $this->site->public_id]))->assertOk()
         ->assertDontSee('<select name="site"', false)
-        ->assertSee('<span class="site-name">Shop</span>', false);
+        ->assertSee('<span class="stats-site-name">Shop</span>', false);
 
     Site::create(['name' => 'Blog', 'domains' => ['blog.example']]);
     $this->get(route('stats.dashboard.site', ['publicId' => $this->site->public_id]))->assertSee('<select name="site"', false);

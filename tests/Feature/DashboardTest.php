@@ -134,14 +134,14 @@ it('charts and tabulates visitors, visits, pageviews, events and outbound clicks
     $html = $this->get(route('stats.dashboard.site', ['publicId' => $site->public_id, 'range' => '7d']))->assertOk()->getContent();
 
     expect($html)->toContain('<svg viewBox="0 0 800 240" role="img"')
-        ->toContain('<td>2026-03-09</td><td class="num">11</td><td class="num">12</td><td class="num">13</td><td class="num">14</td><td class="num">15</td>')
+        ->toContain('<td>2026-03-09</td><td class="stats-num">11</td><td class="stats-num">12</td><td class="stats-num">13</td><td class="stats-num">14</td><td class="stats-num">15</td>')
         ->not->toContain('cdn')
         ->not->toContain('<script src')
         ->not->toContain('<link')
         ->not->toContain('@import')
         ->not->toContain('url(')
-        ->and(substr_count($html, '<path class="line"'))->toBe(5 + 3) // one line per metric: daily chart + AI chart
-        ->and(substr_count($html, '<path class="area"'))->toBe(5 + 3);
+        ->and(substr_count($html, '<path class="stats-line"'))->toBe(5 + 3) // one line per metric: daily chart + AI chart
+        ->and(substr_count($html, '<path class="stats-area"'))->toBe(5 + 3);
 
 });
 
@@ -175,8 +175,8 @@ it('renders every report with its title, rows, shares and CSV link', function ()
         ->assertSee('zh-cn')
         // pages: 300 and 100 pageviews
         ->assertSeeInOrder(['/pricing', 'data-value="0.75"', '75.0%', '/blog/post', 'data-value="0.25"', '25.0%'], false)
-        ->assertSee('<span class="fill" style="width:75%" aria-hidden="true"></span>', false)
-        ->assertSee('<span class="sub">Pricing page · landing</span>', false); // the other text columns under the label
+        ->assertSee('<span class="stats-fill" style="width:75%" aria-hidden="true"></span>', false)
+        ->assertSee('<span class="stats-sub">Pricing page · landing</span>', false); // the other text columns under the label
 });
 
 it('shows the AI summary and the daily AI chart', function () {
@@ -189,7 +189,7 @@ it('shows the AI summary and the daily AI chart', function () {
         ->assertSeeInOrder(['AI visits', '10', 'AI visitors', '9', 'AI fetches', '8'])
         ->assertSee('Daily AI visits and fetches')
         ->assertSee('id="ai-chart-metric-fetches"', false)
-        ->assertSee('<td>2026-03-09</td><td class="num">10</td><td class="num">9</td><td class="num">8</td>', false);
+        ->assertSee('<td>2026-03-09</td><td class="stats-num">10</td><td class="stats-num">9</td><td class="stats-num">8</td>', false);
 });
 
 it('draws accessible donuts with a text legend for the share reports', function () {
@@ -199,12 +199,12 @@ it('draws accessible donuts with a text legend for the share reports', function 
 
     $html = $this->get(route('stats.dashboard.site', ['publicId' => $site->public_id, 'range' => '7d']))->assertOk()->getContent();
 
-    expect(substr_count($html, '<svg class="donut"'))->toBe(count(Dashboard::DONUTS))
+    expect(substr_count($html, '<svg class="stats-donut"'))->toBe(count(Dashboard::DONUTS))
         ->and($html)->toContain('aria-label="Source types by Visitors: share of each item; the legend lists the values."')
         ->toContain('aria-label="Devices by Visitors: share of each item; the legend lists the values."')
-        ->toContain('<span class="name">Desktop</span> 60 (75.0%)')
-        ->toContain('<span class="name">Mobile</span> 20 (25.0%)')
-        ->toContain('<span class="name">Search</span> 28 (59.6%)');
+        ->toContain('<span class="stats-name">Desktop</span> 60 (75.0%)')
+        ->toContain('<span class="stats-name">Mobile</span> 20 (25.0%)')
+        ->toContain('<span class="stats-name">Search</span> 28 (59.6%)');
 });
 
 it('shows a rate without its base as a dash', function () {
@@ -233,9 +233,9 @@ it('marks report tables as sortable with numeric sort values and ships the sorte
 
     $this->get(route('stats.dashboard.site', ['publicId' => $site->public_id, 'range' => '7d']))
         ->assertOk()
-        ->assertSee('<table class="compact" aria-labelledby="report-pages" data-sortable data-top="10">', false)
+        ->assertSee('<table class="stats-compact" aria-labelledby="report-pages" data-sortable data-top="10">', false)
         ->assertSee('<table aria-label="Top pages, all columns" data-sortable>', false)
-        ->assertSee('<td class="num" data-value="1234">1,234</td>', false)
+        ->assertSee('<td class="stats-num" data-value="1234">1,234</td>', false)
         ->assertSee("each('table[data-sortable]'", false)
         ->assertSee('aria-sort', false)
         ->assertSee('"Sort by %s"', false);
@@ -247,19 +247,19 @@ it('deals the cards of a tab out to a left and a right column after the wide cha
     seedEveryReport($site);
 
     $html = $this->get(route('stats.dashboard.site', ['publicId' => $site->public_id, 'range' => '7d']))->assertOk()->getContent();
-    preg_match('/<div role="tabpanel" class="tabpanel" id="panel-pages".*?(?=<div role="tabpanel"|<\/section>)/s', $html, $panel);
-    preg_match_all('/<div class="column">(.*?)<\/div>\n<\/div>\n(?=<div class="column">|<\/div>)/s', $panel[0], $columns);
-    $ids = fn (string $html): array => (preg_match_all('/<article class="card[^"]*" id="(?:chart|card)-([a-z_]+)"/', $html, $m) ? $m[1] : []);
-    $orders = fn (string $html): array => (preg_match_all('/<div class="cell" style="order:(\d+)">/', $html, $m) ? array_map('intval', $m[1]) : []);
+    preg_match('/<div role="tabpanel" class="stats-tabpanel" id="panel-pages".*?(?=<div role="tabpanel"|<\/section>)/s', $html, $panel);
+    preg_match_all('/<div class="stats-column">(.*?)<\/div>\n<\/div>\n(?=<div class="stats-column">|<\/div>)/s', $panel[0], $columns);
+    $ids = fn (string $html): array => (preg_match_all('/<article class="stats-card[^"]*" id="(?:chart|card)-([a-z_]+)"/', $html, $m) ? $m[1] : []);
+    $orders = fn (string $html): array => (preg_match_all('/<div class="stats-cell" style="order:(\d+)">/', $html, $m) ? array_map('intval', $m[1]) : []);
 
     // page_flow is wide: above the columns; then time_on_page, scroll_depth, content_groups and the reports alternate.
-    expect(strpos($panel[0], 'id="chart-page_flow"'))->toBeLessThan(strpos($panel[0], '<div class="columns">'))
+    expect(strpos($panel[0], 'id="chart-page_flow"'))->toBeLessThan(strpos($panel[0], '<div class="stats-columns">'))
         ->and($columns[1])->toHaveCount(2)
         ->and($ids($columns[1][0]))->toBe(['time_on_page', 'content_groups', 'entries', 'engagement', 'content'])
         ->and($ids($columns[1][1]))->toBe(['scroll_depth', 'pages', 'exits', 'page_types', 'transitions'])
         ->and($orders($columns[1][0]))->toBe([0, 2, 4, 6, 8])
         ->and($orders($columns[1][1]))->toBe([1, 3, 5, 7, 9])
-        ->and($html)->toContain('.stats-dash .column{display:contents}'); // one column on narrow screens, in that order
+        ->and($html)->toContain('.stats-dash .stats-column{display:contents}'); // one column on narrow screens, in that order
 });
 
 it('draws the charts of every report tab', function () {
@@ -274,16 +274,16 @@ it('draws the charts of every report tab', function () {
     }
     expect($html)
         ->toContain('Of 20 measured page views, the share that stayed at least this long.')
-        ->toContain('<div class="hbar-value">60.0%</div>')                                  // 12 of 20 stayed 30 s
-        ->toContain('<span class="lbl" title="Pricing page">Pricing page</span><span class="sub">Sales</span>')
+        ->toContain('<div class="stats-hbar-value">60.0%</div>')                                  // 12 of 20 stayed 30 s
+        ->toContain('<span class="stats-lbl" title="Pricing page">Pricing page</span><span class="stats-sub">Sales</span>')
         ->toContain('<title>/pricing → /signup: 12</title>')
-        ->toContain('<span class="name">Search</span> 28')                                 // visitors by source type
-        ->toContain('<span class="lbl" title="Search · google.com">Search · google.com</span><span class="sub">30 visits</span>')
+        ->toContain('<span class="stats-name">Search</span> 28')                                 // visitors by source type
+        ->toContain('<span class="stats-lbl" title="Search · google.com">Search · google.com</span><span class="stats-sub">30 visits</span>')
         ->toContain('<title>DE: 20 visitors</title>')
-        ->toContain('<span class="name">signup</span> 7')                                  // daily count of the top events
-        ->toContain('<span class="lbl" title="/pricing">/pricing</span><span class="sub">5 events / 300 page views</span>')
-        ->toContain('<span class="lbl" title="gptbot">gptbot</span>')
-        ->toContain('<path class="prev"')                                                 // the previous period on the daily chart
+        ->toContain('<span class="stats-name">signup</span> 7')                                  // daily count of the top events
+        ->toContain('<span class="stats-lbl" title="/pricing">/pricing</span><span class="stats-sub">5 events / 300 page views</span>')
+        ->toContain('<span class="stats-lbl" title="gptbot">gptbot</span>')
+        ->toContain('<path class="stats-prev"')                                                 // the previous period on the daily chart
         ->toContain('Dashed: previous period')
         ->toContain('aria-label="Browsers by Visitors')
         ->toContain('aria-label="Operating systems by Visitors');
@@ -424,15 +424,15 @@ it('offers a metric selector for the daily chart with the data for its tooltip',
 
     $html = $this->get(route('stats.dashboard.site', ['publicId' => $site->public_id, 'range' => '7d']))->assertOk()->getContent();
 
-    expect($html)->toContain('<input type="radio" class="metric-radio m0" name="chart-metric" id="chart-metric-visitors" value="visitors" aria-describedby="chart-metric-hint" checked>')
+    expect($html)->toContain('<input type="radio" class="stats-metric-radio stats-m0" name="chart-metric" id="chart-metric-visitors" value="visitors" aria-describedby="chart-metric-hint" checked>')
         ->toContain('id="chart-metric-outbound" value="outbound"')
-        ->toContain('<label for="chart-metric-pageviews" class="t2">Pageviews</label>')
-        ->toContain('<g class="layer l4" data-metric="outbound">')
-        ->toContain('<div class="plot" tabindex="0" role="group" aria-label="Daily traffic: use the left and right arrow keys')
-        ->toContain('<div class="tip" role="status" aria-live="polite" hidden></div>')
-        ->and(substr_count($html, 'class="metric-radio'))->toBe(count(Dashboard::CHART_METRICS) + count(Dashboard::AI_CHART_METRICS));
+        ->toContain('<label for="chart-metric-pageviews" class="stats-t2">Pageviews</label>')
+        ->toContain('<g class="stats-layer stats-l4" data-metric="outbound">')
+        ->toContain('<div class="stats-plot" tabindex="0" role="group" aria-label="Daily traffic: use the left and right arrow keys')
+        ->toContain('<div class="stats-tip" role="status" aria-live="polite" hidden></div>')
+        ->and(substr_count($html, 'class="stats-metric-radio'))->toBe(count(Dashboard::CHART_METRICS) + count(Dashboard::AI_CHART_METRICS));
 
-    preg_match('/<section class="card chart" aria-labelledby="chart-title" data-chart="([^"]+)"/', $html, $m);
+    preg_match('/<section class="stats-card stats-chart" aria-labelledby="chart-title" data-chart="([^"]+)"/', $html, $m);
     $data = json_decode(html_entity_decode($m[1]), true);
     expect($data['dates'])->toHaveCount(7)
         ->and($data['dates'][5])->toBe('Mon, Mar 9')
@@ -471,14 +471,14 @@ it('shows the top 10 rows of a report card with a toggle to show all of them', f
     S::page($site, '2026-03-09', '/blog', ['pageviews' => 5, 'visitors' => 5, 'exits' => 5]);
 
     $html = $this->get(route('stats.dashboard.site', ['publicId' => $site->public_id, 'range' => '7d']))->assertOk()->getContent();
-    preg_match('/<article class="card report" id="card-pages">.*?<\/article>/s', $html, $pages);
-    preg_match('/<article class="card report" id="card-exits">.*?<\/article>/s', $html, $exits);
+    preg_match('/<article class="stats-card stats-report" id="card-pages">.*?<\/article>/s', $html, $pages);
+    preg_match('/<article class="stats-card stats-report" id="card-exits">.*?<\/article>/s', $html, $exits);
 
-    expect($pages[0])->toContain('<button type="button" class="link more-toggle" aria-expanded="false" data-more="Show all 13" data-less="Show top 10" hidden>Show all 13</button>')
-        ->and(substr_count($pages[0], '<tr class="more">'))->toBe(3)
-        ->and(substr_count($pages[0], '<td class="key"><div class="bar-row">'))->toBe(13)
+    expect($pages[0])->toContain('<button type="button" class="stats-link stats-more-toggle" aria-expanded="false" data-more="Show all 13" data-less="Show top 10" hidden>Show all 13</button>')
+        ->and(substr_count($pages[0], '<tr class="stats-more">'))->toBe(3)
+        ->and(substr_count($pages[0], '<td class="stats-key"><div class="stats-bar-row">'))->toBe(13)
         ->and($exits[0])->not->toContain('more-toggle')
-        ->and($html)->toContain('.stats-dash.js table.compact tr.more{display:none}')
+        ->and($html)->toContain('.stats-dash.stats-js table.stats-compact tr.stats-more{display:none}')
         ->toContain("button.getAttribute(open ? 'data-less' : 'data-more')");
 });
 
@@ -488,17 +488,17 @@ it('puts every column of wide reports into a details view', function () {
     seedEveryReport($site);
 
     $html = $this->get(route('stats.dashboard.site', ['publicId' => $site->public_id, 'range' => '7d']))->assertOk()->getContent();
-    preg_match('/<article class="card report" id="card-engagement">.*?<\/article>/s', $html, $card);
+    preg_match('/<article class="stats-card stats-report" id="card-engagement">.*?<\/article>/s', $html, $card);
 
-    expect($card[0])->toContain('<details class="details">')
+    expect($card[0])->toContain('<details class="stats-details">')
         ->toContain('<summary>All columns</summary>')
         ->toContain('<table aria-label="Time on page and scroll depth, all columns" data-sortable>')
-        ->toContain('<th scope="col" class="num">≥ 10 s</th>')
-        ->toContain('<th scope="col" class="num">Scrolled to end</th>')
-        ->toContain('<td class="num" data-value="60">1m 00s</td>')              // 1200 s over 20 measured views
-        ->toContain('<td class="num" data-value="0.6">60.0%</td>')               // 12 of 20 views stayed 30 s
+        ->toContain('<th scope="col" class="stats-num">≥ 10 s</th>')
+        ->toContain('<th scope="col" class="stats-num">Scrolled to end</th>')
+        ->toContain('<td class="stats-num" data-value="60">1m 00s</td>')              // 1200 s over 20 measured views
+        ->toContain('<td class="stats-num" data-value="0.6">60.0%</td>')               // 12 of 20 views stayed 30 s
         ->and(substr_count($card[0], '<th scope="col"'))->toBe(3 + count(StatsQuery::COLUMNS['engagement']) + 1)
-        ->and($card[0])->toContain('<div class="table-scroll">');                // scrolls sideways inside its column
+        ->and($card[0])->toContain('<div class="stats-table-scroll">');                // scrolls sideways inside its column
 
     expect(Dashboard::layout('engagement'))->toBe(['label' => 'path', 'sub' => ['title'], 'metric' => 'engaged_views', 'details' => true])
         ->and(Dashboard::layout('exits')['details'])->toBeFalse()
@@ -535,13 +535,13 @@ it('renders the KPI strip with arrows, the comparison label and sparklines', fun
 
     $html = $this->get(route('stats.dashboard.site', ['publicId' => $site->public_id, 'range' => '7d']))->assertOk()->getContent();
 
-    expect($html)->toContain('<div class="kpis primary"')
-        ->toContain('<div class="kpis secondary" role="group" aria-label="More metrics">')
-        ->toContain('<div class="delta good" title="Compared days: 20; previous days: 10"><span aria-hidden="true">↑</span> +100.0%')
-        ->toContain('<div class="delta good" title="Compared days: 25.0%; previous days: 50.0%"><span aria-hidden="true">↓</span> −50.0%') // lower bounce rate is better
+    expect($html)->toContain('<div class="stats-kpis stats-primary"')
+        ->toContain('<div class="stats-kpis stats-secondary" role="group" aria-label="More metrics">')
+        ->toContain('<div class="stats-delta stats-good" title="Compared days: 20; previous days: 10"><span aria-hidden="true">↑</span> +100.0%')
+        ->toContain('<div class="stats-delta stats-good" title="Compared days: 25.0%; previous days: 50.0%"><span aria-hidden="true">↓</span> −50.0%') // lower bounce rate is better
         ->toContain('vs previous days')
-        ->toContain('<svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"')
-        ->and(substr_count($html, '<svg class="spark"'))->toBe(10); // every KPI except realtime
+        ->toContain('<svg class="stats-spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"')
+        ->and(substr_count($html, '<svg class="stats-spark"'))->toBe(10); // every KPI except realtime
 });
 
 it('ships light and dark design tokens, focus styles and reduced motion', function () {
