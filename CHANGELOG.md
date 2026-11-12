@@ -6,6 +6,8 @@ All notable changes to N2N Stats are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.1.12] - 2026-11-13
+
 ### Fixed
 
 - Every CSS class of the dashboard and site pages starts with `stats-`, so a host admin's own styles with generic
@@ -209,6 +211,7 @@ All notable changes to N2N Stats are listed here. The format follows
 - Commands `stats:install`, `stats:site`, `stats:token` and `stats:maintain` (scheduled every five
   minutes); configurable retention of aggregates.
 
+[0.1.12]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.12
 [0.1.11]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.11
 [0.1.10]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.10
 [0.1.9]: https://github.com/n2ns/laravel-site-stats/releases/tag/v0.1.9
